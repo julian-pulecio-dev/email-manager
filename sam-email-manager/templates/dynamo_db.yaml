@@ -1,0 +1,17 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31 
+Resources:
+  UserTokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: UserTokens
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: Email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: Email
+          KeyType: HASH
+      Tags:
+        - Key: Environment
+          Value: Production      

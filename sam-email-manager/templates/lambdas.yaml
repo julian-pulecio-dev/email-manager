@@ -1,0 +1,144 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  RequestsLayerArn:
+    Type: String
+    Description: The ARN of the Requests dependency layer.
+  GmailLayerArn:
+    Type: String
+    Description: The ARN of the Gmail API dependency layer.
+  VertexAILayerArn:
+    Type: String
+    Description: The ARN of the Vertex AI API dependency layer.
+  AuthUserPoolId:
+    Type: String
+    Description: The ID of the Cognito User Pool.
+  AuthUserPoolARN:
+    Type: String
+    Description: The ARN of the Cognito User Pool.
+  AuthUserPoolClientId:
+    Type: String
+    Description: The ID of the Cognito User Pool Client.
+  AuthDomain:
+    Type: String
+    Description: The domain name for the Cognito User Pool.
+  CallbackURL:
+    Type: String
+    Description: The callback URL for the Cognito User Pool Client.
+
+Globals:
+  Function:
+    Timeout: 600
+    Runtime: python3.12
+    Architectures:
+      - x86_64
+    MemorySize: 512
+    CodeUri: ../lambdas   
+
+Resources:
+  EmailManagerApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      EndpointConfiguration: REGIONAL
+      Cors:
+        AllowMethods: "'OPTIONS,GET,POST'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+        MaxAge: 3000
+      Auth:
+        DefaultAuthorizer: EmailManagerAuthCognitoAuthorizer
+        Authorizers:
+          EmailManagerAuthCognitoAuthorizer:
+            UserPoolArn: !Ref AuthUserPoolARN
+            AuthorizerResultTtlInSeconds: 0
+            Identity:
+              Header: Authorization
+              ReauthorizeEvery: 0
+
+
+  GetGoogleOAuthTokensFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.get_google_oauth_tokens.lambda_handler
+      Layers:
+        - !Ref RequestsLayerArn
+        - !Ref GmailLayerArn
+      Environment:
+        Variables:
+          GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /get_google_oauth_tokens
+            Method: GET
+
+  TransformPromptToJSONFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.transform_prompt_to_json.lambda_handler
+      Layers:
+        - !Ref RequestsLayerArn
+        - !Ref GmailLayerArn
+      Environment:
+        Variables:
+          GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /transform_prompt_to_json
+            Method: POST
+
+  SendEmailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.send_email.lambda_handler
+      Layers:
+        - !Ref RequestsLayerArn
+        - !Ref GmailLayerArn
+      Environment:
+        Variables:
+          GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /send_email
+            Method: POST
+
+  SocialAuthCallbackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.social_auth_callback.lambda_handler
+      Environment:
+        Variables:
+          EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID: !Ref AuthUserPoolClientId
+          EMAIL_MANAGER_AUTH_USER_POOL_DOMAIN: !Ref AuthDomain
+          CALLBACK_URL: !Ref CallbackURL
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Events:
+        Preflight:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /email_manager_social_auth_callback
+            Method: OPTIONS
+            Auth:
+              Authorizer: NONE
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /email_manager_social_auth_callback
+            Method: POST
+            Auth:
+              Authorizer: NONE

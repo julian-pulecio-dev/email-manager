@@ -1,47 +1,45 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31  # <-- REQUIRED for SAM
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  CallbackURL:
+    Type: String
+    Description: The callback URL for the Cognito User Pool Client.
+
+  LogoutURL:
+    Type: String
+    Description: The logout URL for the Cognito User Pool Client.
+    
 Resources:
-  EmailManagerApi:
-    Type: AWS::Serverless::Api
+  Cognito:
+    Type: AWS::Serverless::Application
     Properties:
-      StageName: dev
-      EndpointConfiguration: REGIONAL
-      Cors:
-        AllowMethods: "'OPTIONS,GET,POST'"
-        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-        AllowOrigin: "'*'"
-        MaxAge: 3000
+      Location: templates/cognito.yaml
+      Parameters:
+        CallbackURL: !Ref CallbackURL
+        LogoutURL: !Ref LogoutURL
+  
 
-  DependenciesLayer:
-    Type: AWS::Serverless::LayerVersion
+  Dependencies:
+    Type: AWS::Serverless::Application
     Properties:
-      LayerName: python-dependencies
-      Description: Dependencies for HelloWorldFunction
-      ContentUri: layer.zip
-      CompatibleRuntimes:
-        - python3.12
-      LicenseInfo: "MIT"
-      RetentionPolicy: Retain
+      Location: templates/dependencies.yaml
+  
+  DynamoDB:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location: templates/dynamo_db.yaml
 
-  HelloWorldFunction:
-    Type: AWS::Serverless::Function
+  Lambdas:
+    Type: AWS::Serverless::Application
     Properties:
-      CodeUri: hello_world/
-      Handler: app.lambda_handler
-      Runtime: python3.12
-      Timeout: 600
-      Architectures:
-        - x86_64
-      Layers:
-        - !Ref DependenciesLayer
-      Environment:
-        Variables:
-          GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
-          GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
-      Events:
-        Api:
-          Type: Api
-          Properties:
-            RestApiId: !Ref EmailManagerApi
-            Path: /hello_world
-            Method: GET
+      Location: templates/lambdas.yaml
+      Parameters:
+        RequestsLayerArn: !GetAtt Dependencies.Outputs.RequestsLayerArn
+        GmailLayerArn: !GetAtt Dependencies.Outputs.GmailLayerArn
+        VertexAILayerArn: !GetAtt Dependencies.Outputs.VertexAILayerArn
+        AuthUserPoolId: !GetAtt Cognito.Outputs.AuthUserPoolId
+        AuthUserPoolARN: !GetAtt Cognito.Outputs.AuthUserPoolARN
+        AuthUserPoolClientId: !GetAtt Cognito.Outputs.AuthUserPoolClientId
+        AuthDomain: !GetAtt Cognito.Outputs.AuthDomain
+        CallbackURL: !Ref CallbackURL
+

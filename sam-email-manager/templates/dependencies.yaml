@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  RequestsLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: requests-dependencies
+      Description: Dependencies for HelloWorldFunction
+      ContentUri: ../dependencies/requests
+      CompatibleRuntimes:
+        - python3.12
+
+  GmailLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: gmail-dependencies
+      Description: Dependencies for Gmail API
+      ContentUri: ../dependencies/gmail
+      CompatibleRuntimes:
+        - python3.12
+
+  VertexAILayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: vertex-ai-dependencies
+      Description: Dependencies for Vertex AI API
+      ContentUri: ../dependencies/vertex_ai
+      CompatibleRuntimes:
+        - python3.12
+
+
+Outputs:
+  RequestsLayerArn:
+    Description: The ARN of the Requests dependency layer.
+    Value: !Ref RequestsLayer
+
+  GmailLayerArn:
+    Description: The ARN of the Gmail API dependency layer.
+    Value: !Ref GmailLayer
+
+  VertexAILayerArn:
+    Description: The ARN of the Vertex AI API dependency layer.
+    Value: !Ref VertexAILayer

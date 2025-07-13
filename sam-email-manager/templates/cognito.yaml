@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  sam-social-login-auth
+  Sample SAM Template for sam-social-login-auth
+
+Parameters:
+  CallbackURL:
+    Type: String
+    Description: The callback URL for the Cognito User Pool Client.
+
+  LogoutURL:
+    Type: String
+    Description: The logout URL for the Cognito User Pool Client.
+
+Resources:
+  AuthUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: AuthUserPool
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      AutoVerifiedAttributes:
+        - email
+
+  AuthGoogleIdentityProvider:
+    DependsOn: AuthUserPool
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref AuthUserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
+        client_secret: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
+        authorize_scopes: "profile email openid"
+      AttributeMapping:
+        email: email
+        name: name
+  
+  AuthUserPoolClient:
+    DependsOn: AuthGoogleIdentityProvider
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref AuthUserPool
+      ClientName: AuthUserPoolClient
+      GenerateSecret: false
+      AllowedOAuthFlows: 
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      CallbackURLs:
+        - !Ref CallbackURL
+      LogoutURLs:
+        - !Ref LogoutURL
+      SupportedIdentityProviders:
+        - Google
+      EnableTokenRevocation: true
+      RefreshTokenValidity: 30
+      ReadAttributes:
+        - email
+        - name
+      WriteAttributes:
+        - email
+        - name
+    
+  AuthUserPoolDomain:
+    DependsOn: AuthUserPool
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: email-manager-auth-domain
+      UserPoolId: !Ref AuthUserPool
+
+Outputs:
+  AuthUserPoolId:
+    Description: The ID of the Cognito User Pool.
+    Value: !Ref AuthUserPool
+
+  AuthUserPoolARN:
+    Description: The ARN of the Cognito User Pool.
+    Value: !GetAtt AuthUserPool.Arn
+
+  AuthUserPoolClientId:
+    Description: The ID of the Cognito User Pool Client.
+    Value: !Ref AuthUserPoolClient
+
+  AuthDomain:
+    Description: The domain of the Cognito User Pool.
+    Value: !Sub "${AuthUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
