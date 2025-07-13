@@ -6,7 +6,7 @@ from urllib.parse import parse_qs
 class Event:
     def __init__(self, lambda_event: dict):
         self.event_type = lambda_event.get("event_type")
-        self.data = self.__get_parameters(lambda_event)
+        self.data = json.loads(self.__get_parameters(lambda_event))
         self.headers = lambda_event.get("headers", {})
 
     def __get_parameters(self, lambda_event: dict):

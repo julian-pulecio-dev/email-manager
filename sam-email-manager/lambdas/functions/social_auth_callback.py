@@ -4,6 +4,7 @@ import os
 from urllib3 import PoolManager
 from urllib.parse import urlencode
 from src.decorators.lambda_decorator import LambdaDecorator
+from src.requests.social_auth_callback_request import SocialAuthCallbackRequest
 
 client = boto3.client('cognito-idp', region_name='us-east-1')
 
@@ -11,21 +12,10 @@ EMAIL_MANAGER_AUTH_USER_POOL_DOMAIN = os.environ.get("EMAIL_MANAGER_AUTH_USER_PO
 EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID = os.environ.get("EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID")
 CALLBACK_URL = os.environ.get("CALLBACK_URL")
 
-@LambdaDecorator
-def lambda_handler(event, context):
-    print("Received event:", event)
-    if event["httpMethod"] == "OPTIONS":
-        return {
-            "statusCode": 204,
-            "headers": {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type,Authorization",
-                "Access-Control-Allow-Methods": "OPTIONS,POST"
-            },
-            "body": ""
-        }
-    body = json.loads(event['body'])
-    code = body['code']
+@LambdaDecorator(request_class=SocialAuthCallbackRequest)
+def lambda_handler(event_request: SocialAuthCallbackRequest, context):
+    print("Received event:", event_request)
+    code = event_request.code
 
     token_url = f"https://{EMAIL_MANAGER_AUTH_USER_POOL_DOMAIN}/oauth2/token"
     payload = {
