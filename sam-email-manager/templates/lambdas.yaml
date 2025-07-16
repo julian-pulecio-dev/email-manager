@@ -10,6 +10,9 @@ Parameters:
   VertexAILayerArn:
     Type: String
     Description: The ARN of the Vertex AI API dependency layer.
+  LambdaSRCLayerArn:
+    Type: String
+    Description: The ARN of the Lambda source dependency layer.
   AuthUserPoolId:
     Type: String
     Description: The ID of the Cognito User Pool.
@@ -118,6 +121,8 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       Handler: functions.social_auth_callback.lambda_handler
+      Layers:
+        - !Ref LambdaSRCLayerArn
       Environment:
         Variables:
           EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID: !Ref AuthUserPoolClientId

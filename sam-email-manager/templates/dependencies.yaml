@@ -27,7 +27,15 @@ Resources:
       ContentUri: ../dependencies/vertex_ai
       CompatibleRuntimes:
         - python3.12
-
+  
+  LambdaSRCLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: lambda-src-dependencies
+      Description: Dependencies for Lambda source
+      ContentUri: ../dependencies/lambda_src
+      CompatibleRuntimes:
+        - python3.12
 
 Outputs:
   RequestsLayerArn:
@@ -41,3 +49,7 @@ Outputs:
   VertexAILayerArn:
     Description: The ARN of the Vertex AI API dependency layer.
     Value: !Ref VertexAILayer
+  
+  LambdaSRCLayerArn:
+    Description: The ARN of the Lambda source dependency layer.
+    Value: !Ref LambdaSRCLayer

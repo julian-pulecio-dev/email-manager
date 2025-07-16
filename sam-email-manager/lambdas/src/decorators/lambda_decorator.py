@@ -1,11 +1,15 @@
 from src.models.event import Event
 from src.utils.headers import get_headers
 from src.requests.request import Request
+from dataclasses import dataclass
+from dataclasses import dataclass
+from typing import Optional, Callable
+from dataclasses import field
 
+@dataclass
 class LambdaDecorator:
-    def __init__(self, func=None, *, request_class: Request = None):
-        self.func = func
-        self.request_class = request_class
+    func: Optional[Callable] = None
+    request_class: Optional[Request] = field(default=None, kw_only=True)
 
     def __call__(self, *args, **kwargs):
         if self.func is not None and len(args) == 1 and callable(args[0]):
@@ -28,7 +32,7 @@ class LambdaDecorator:
                 'headers': get_headers(),
                 'body': ''
             }
-        lambda_event = Event(event)
+        lambda_event = Event.from_lambda_event(event)
         print(f"Lambda event: {lambda_event}")
-        request = self.request_class(lambda_event)
+        request = self.request_class.from_event(lambda_event)
         return self.func(request, context)

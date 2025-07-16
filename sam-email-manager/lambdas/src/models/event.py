@@ -1,23 +1,46 @@
 import base64
 import json
 from urllib.parse import parse_qs
+from dataclasses import dataclass
 
 
+@dataclass
 class Event:
-    def __init__(self, lambda_event: dict):
-        self.event_type = lambda_event.get("event_type")
-        self.data = json.loads(self.__get_parameters(lambda_event))
-        self.headers = lambda_event.get("headers", {})
+    """Represents an AWS Lambda event with parsed parameters."""
+    event_type: str
+    data: dict
+    headers: dict
 
-    def __get_parameters(self, lambda_event: dict):
+    @classmethod
+    def from_lambda_event(cls, lambda_event: dict):
+        """
+        Factory method to create an Event instance from a Lambda event dictionary.
+        Args:
+            lambda_event (dict): The Lambda event dictionary.
+        Returns:
+            Event: An instance of the Event class.
+        """
+        return cls(
+            event_type=lambda_event.get("event_type"),
+            data=json.loads(cls.__get_parameters(lambda_event)),
+            headers=lambda_event.get("headers", {})
+        )
+
+    @classmethod
+    def __get_parameters(cls, lambda_event: dict):
+        """Determines the type of parameters to extract based on the HTTP method."""
+
         http_method = lambda_event.get('httpMethod')
         if http_method == 'GET':
-            return self.__get_querystring_parameters(lambda_event)
+            return cls.__get_querystring_parameters(lambda_event)
         if http_method in ['POST', 'PUT', 'PATCH']:
-            return self.__get_body_parameters(lambda_event)
+            return cls.__get_body_parameters(lambda_event)
 
-    def __get_querystring_parameters(self, lambda_event: dict) -> dict:
+    @classmethod
+    def __get_querystring_parameters(cls, lambda_event: dict) -> dict:
         query_params = lambda_event.get('queryStringParameters', {})
+        """Extracts query string parameters from the Lambda event."""
+
         multi_value_params = lambda_event.get('multiValueQueryStringParameters', {})
             
         parsed_params = {**query_params} if query_params else {}
@@ -29,7 +52,10 @@ class Event:
             
             return parsed_params
     
-    def __get_body_parameters(self, lambda_event: dict) -> dict:
+    @classmethod
+    def __get_body_parameters(cls, lambda_event: dict) -> dict:
+        """Extracts body parameters from the Lambda event."""
+        
         content_type = lambda_event.get('headers', {}).get('Content-Type', '').lower()
         body = lambda_event.get('body', '')
 
