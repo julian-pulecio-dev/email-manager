@@ -1,7 +1,8 @@
 from src.models.event import Event
+from src.exceptions.invalid_request_exception import InvalidRequestException
+from src.exceptions.server_exception import ServerException
 
-
-class Request:
+class EventRequest:
     @classmethod
     def from_event(cls, event: Event):
         """
@@ -14,4 +15,6 @@ class Request:
         try:
             return cls(**event.data)
         except TypeError as e:
-            raise TypeError(f"Invalid event data for {cls.__name__}: {e}")
+            raise InvalidRequestException(f"Invalid event data for {cls.__name__}: {e}")
+        except Exception as e:
+            raise ServerException(f"Failed to create request from event: {str(e)}")

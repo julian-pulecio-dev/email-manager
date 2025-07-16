@@ -2,7 +2,7 @@ import base64
 import json
 from urllib.parse import parse_qs
 from dataclasses import dataclass
-
+from src.exceptions.invalid_request_exception import InvalidRequestException
 
 @dataclass
 class Event:
@@ -70,7 +70,7 @@ class Event:
             else:
                 return body
         except Exception as e:
-            raise ValueError(f"Failed to parse body: {str(e)}")
+            raise InvalidRequestException(f"Failed to parse body: {str(e)}")
 
     def __repr__(self):
         return f"Event(event_type={self.event_type}, data={self.data}, headers={self.headers})"

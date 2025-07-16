@@ -1,10 +1,7 @@
 import json
-import os
 import logging
-import requests
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
-from src.decorators.lambda_decorator import LambdaDecorator
 import google.auth.transport.requests
 from src.utils.headers import get_headers
 import jwt
@@ -22,7 +19,6 @@ def get_access_token():
     credentials.refresh(request)
     return credentials.token
 
-@LambdaDecorator
 def lambda_handler(event, context):
     return {
         "statusCode": 200,

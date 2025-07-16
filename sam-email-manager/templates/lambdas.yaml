@@ -123,6 +123,7 @@ Resources:
       Handler: functions.social_auth_callback.lambda_handler
       Layers:
         - !Ref LambdaSRCLayerArn
+        - !Ref RequestsLayerArn
       Environment:
         Variables:
           EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID: !Ref AuthUserPoolClientId

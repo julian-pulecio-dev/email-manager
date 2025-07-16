@@ -1,8 +1,8 @@
 from src.models.event import Event
-from src.requests.request import Request
+from src.event_requests.event_request import EventRequest
 from dataclasses import dataclass
 
 @dataclass
-class SocialAuthCallbackRequest(Request):
+class SocialAuthCallbackRequest(EventRequest):
     code: str
     provider: str
