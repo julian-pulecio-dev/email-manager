@@ -20,9 +20,13 @@ class Event:
         Returns:
             Event: An instance of the Event class.
         """
+        parameters = cls.__get_parameters(lambda_event)
+        print(parameters)
+        if not isinstance(parameters,dict):
+            parameters = json.loads(parameters)
         return cls(
             event_type=lambda_event.get("event_type"),
-            data=json.loads(cls.__get_parameters(lambda_event)),
+            data=parameters,
             headers=lambda_event.get("headers", {})
         )
 

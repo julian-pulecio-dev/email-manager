@@ -1,5 +1,6 @@
 import { createContext, useEffect, useState } from "react";
 import { callbackSocialLogin } from "../Services/Auth/CallbackSocialLogin";
+import { getGoogleOauthTokens } from "../Services/Auth/GetGoogleOauthTokens"
 import type { UserProfile } from "../Types/User";
 import { decodeToken } from "../Helpers/DecodeJWT";
 import React from "react";
@@ -10,6 +11,7 @@ type UserContextType = {
   token: string | null;
   error: string | null;
   callbackSocialLoginUser: (code: string, provider: string) => Promise<boolean>;
+  getGoogleOauthTokensUser: (code: string, provider: string) => Promise<boolean>;
   logoutUser: () => void;
   isLoggedIn: () => boolean;
   setError: (error: string | null) => void;
@@ -60,6 +62,15 @@ export const UserProvider = ({ children }: Props) => {
     return false;
   };
 
+  const getGoogleOauthTokensUser = async (code: string) => {
+    const res = await getGoogleOauthTokens(code);
+    if (res?.status == 200) {
+      localStorage.setItem("google_oauth", "approved");
+      return true
+    }
+    return false;
+  };
+
   const logoutUser = async () => {
   };
 
@@ -71,6 +82,7 @@ export const UserProvider = ({ children }: Props) => {
     <UserContext.Provider
       value={{
         callbackSocialLoginUser,
+        getGoogleOauthTokensUser,
         user,
         token,
         logoutUser,

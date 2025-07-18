@@ -7,8 +7,6 @@ from urllib.parse import urlencode
 from dataclasses import dataclass
 from src.exceptions.invalid_request_exception import InvalidRequestException
 from src.exceptions.server_exception import ServerException
-from typing import Optional
-
 
 client = boto3.client('cognito-idp', region_name='us-east-1')
 

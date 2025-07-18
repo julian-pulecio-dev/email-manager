@@ -1,81 +1,28 @@
+import traceback
+import os
 import json
+import requests
 import logging
-from googleapiclient.discovery import build
-from google.oauth2 import service_account
-import google.auth.transport.requests
+from urllib.parse import urlencode
 from src.utils.headers import get_headers
-import jwt
+from src.decorators.event_parser import EventParser
+from src.event_requests.get_google_oauth_tokens_requests import GetGoogleOAuthTokensRequest
+from src.models.google_oauth.google_oauth import GoogleOAuth
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def get_access_token():
-    """Obtiene un access token usando la cuenta de servicio."""
-    credentials = service_account.Credentials.from_service_account_file(
-        'email-manager.json',
-        scopes=['https://www.googleapis.com/auth/cloud-platform'],
+@EventParser(request_class=GetGoogleOAuthTokensRequest)
+def lambda_handler(event:GetGoogleOAuthTokensRequest, context):
+    google_auth = GoogleOAuth(
+        client_id=os.environ['GOOGLE_CLIENT_ID'],
+        client_secret=os.environ['GOOGLE_CLIENT_SECRET'],
+        redirect_uri='http://localhost:5173/google-oauth-confirm-code'
     )
-    request = google.auth.transport.requests.Request()
-    credentials.refresh(request)
-    return credentials.token
-
-def lambda_handler(event, context):
+    response = google_auth.exchange_code_for_tokens(event.code)
+    logger.info(f"Access tokens received: {response}")
     return {
         "statusCode": 200,
         "headers": get_headers(),
-        "body": json.dumps({
-            "message": "This is a placeholder response. Implement your logic here."
-        })
+        "body": json.dumps(response)
     }
-    # try:
-    #     code = event["queryStringParameters"].get("code")
-    #     if not code:
-    #         return {"statusCode": 400, "body": json.dumps({"error": "No authorization code found"})}
-
-    #     client_id = os.environ.get("GOOGLE_CLIENT_ID")
-    #     client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
-    #     redirect_uri = "https://8ay9rilai8.execute-api.us-east-1.amazonaws.com/dev/get_google_oauth_tokens"
-
-    #     token_data = {
-    #         "code": code,
-    #         "client_id": client_id,
-    #         "client_secret": client_secret,
-    #         "redirect_uri": redirect_uri,
-    #         "grant_type": "authorization_code"
-    #     }
-
-    #     token_response = requests.post(
-    #         "https://oauth2.googleapis.com/token",
-    #         data=token_data,
-    #         headers={"Content-Type": "application/x-www-form-urlencoded"}
-    #     )
-
-    #     if token_response.status_code != 200:
-    #         logger.error(f"Fallo al intercambiar el código: {token_response.text}")
-    #         return {
-    #             "statusCode": token_response.status_code,
-    #             "body": token_response.text
-    #         }
-
-    #     tokens = token_response.json()
-    #     id_token = tokens.get("id_token")
-    #     if not id_token:
-    #         raise Exception("No id_token found in token response")
-
-    #     decoded = jwt.decode(id_token, options={"verify_signature": False})
-    #     email = decoded.get("email")
-
-    #     logger.info(f"Tokens recibidos: {json.dumps(tokens)}")
-    #     logger.info(f"Email extraído del id_token: {email}")
-
-    #     return {
-    #         "statusCode": 200,
-    #         "body": json.dumps(tokens),
-    #     }
-
-    # except Exception as e:
-    #     logger.exception("Error intercambiando el código por tokens")
-    #     return {
-    #         "statusCode": 500,
-    #         "body": json.dumps({"error": str(e)})
-    #     }
