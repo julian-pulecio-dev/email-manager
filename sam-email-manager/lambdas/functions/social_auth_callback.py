@@ -2,7 +2,7 @@ import json
 import logging
 from src.decorators.event_parser import EventParser
 from src.event_requests.social_auth_callback_request import SocialAuthCallbackRequest
-from src.models.social_auth.social_auth import SocialAuth
+from src.models.social_auth import SocialAuth
 from src.utils.headers import get_headers
 
 logger = logging.getLogger()

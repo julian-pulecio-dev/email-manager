@@ -1,17 +1,25 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31 
 Resources:
-  UserTokensTable:
+  GoogleOAuthAccessTokensTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: UserTokens
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: Email
+        - AttributeName: email
           AttributeType: S
       KeySchema:
-        - AttributeName: Email
+        - AttributeName: email
           KeyType: HASH
       Tags:
         - Key: Environment
-          Value: Production      
+          Value: Production
+
+Outputs:
+  GoogleOAuthAccessTokensTableArn:
+    Value: !GetAtt GoogleOAuthAccessTokensTable.Arn
+    Description:  "DynamoDB Table ARN for the user google oauth tokens"
+  GoogleOAuthAccessTokensTableName:
+    Value: !Ref GoogleOAuthAccessTokensTable
+    Description: "DynamoDB Table Name for the user google oauth tokens"

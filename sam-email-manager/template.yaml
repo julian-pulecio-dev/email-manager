@@ -38,6 +38,8 @@ Resources:
         GmailLayerArn: !GetAtt Dependencies.Outputs.GmailLayerArn
         VertexAILayerArn: !GetAtt Dependencies.Outputs.VertexAILayerArn
         LambdaSRCLayerArn: !GetAtt Dependencies.Outputs.LambdaSRCLayerArn
+        GoogleOAuthAccessTokensTableArn: !GetAtt DynamoDB.Outputs.GoogleOAuthAccessTokensTableArn
+        GoogleOAuthAccessTokensTableName: !GetAtt DynamoDB.Outputs.GoogleOAuthAccessTokensTableName
         AuthUserPoolId: !GetAtt Cognito.Outputs.AuthUserPoolId
         AuthUserPoolARN: !GetAtt Cognito.Outputs.AuthUserPoolARN
         AuthUserPoolClientId: !GetAtt Cognito.Outputs.AuthUserPoolClientId

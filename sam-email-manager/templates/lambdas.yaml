@@ -13,6 +13,12 @@ Parameters:
   LambdaSRCLayerArn:
     Type: String
     Description: The ARN of the Lambda source dependency layer.
+  GoogleOAuthAccessTokensTableArn:
+    Type: String
+    Description: The ARN of the GoogleAccessTokensTable DynamoDB table
+  GoogleOAuthAccessTokensTableName:
+    Type: String
+    Description: The name of the GoogleAccessTokensTable DynamoDB table
   AuthUserPoolId:
     Type: String
     Description: The ID of the Cognito User Pool.
@@ -71,6 +77,7 @@ Resources:
         Variables:
           GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
           GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
+          GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: !Ref GoogleOAuthAccessTokensTableName
       Events:
         Preflight:
           Type: Api
@@ -88,6 +95,16 @@ Resources:
             Method: POST
             Auth:
               Authorizer: NONE
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: !Ref GoogleOAuthAccessTokensTableArn
 
   TransformPromptToJSONFunction:
     Type: AWS::Serverless::Function

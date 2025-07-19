@@ -1,4 +1,3 @@
-from src.models.event import Event
 from src.event_requests.event_request import EventRequest
 from dataclasses import dataclass
 

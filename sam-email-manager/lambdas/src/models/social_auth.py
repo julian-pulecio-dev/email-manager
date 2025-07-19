@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from src.models.social_auth.google_social_auth import GoogleSocialAuth
+from src.models.google_social_auth import GoogleSocialAuth
 from src.exceptions.invalid_request_exception import InvalidRequestException
 
 

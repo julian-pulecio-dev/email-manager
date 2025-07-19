@@ -32,6 +32,7 @@ class GoogleOAuth:
             headers={"Content-Type": "application/x-www-form-urlencoded"}
         )
         return self.__validate_response(token_response)
+    
 
     def __validate_response(self, token_response) -> dict:
         if token_response.status_code == 200:
