@@ -1,6 +1,6 @@
 export const cognitoUserPool = {
-  UserPoolId: 'us-east-1_JWhGIdxLp',
-  ClientId: '278k03jnf8td6podkqb2glf4d6',
+  UserPoolId: 'us-east-1_U5Dtpbx6W',
+  ClientId: '52e5pb1uipkm8h6lqf94ftbots',
   Region: 'us-east-1', // e.g., 'us-east-1'
   IdentityPoolId: 'your-identity-pool-id', // only needed if using AWS services
   Domain: 'https://email-manager-auth-domain.auth.us-east-1.amazoncognito.com',

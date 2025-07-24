@@ -18,10 +18,8 @@ def lambda_handler(event:GetGoogleOAuthTokensRequest, context):
         redirect_uri='http://localhost:5173/google-oauth-confirm-code'
     )
     access_tokens = google_auth.exchange_code_for_tokens(event.code)
-    logger.info(f"Access tokens received: {json.dumps(access_tokens)} ")
-    
     dynamo_db = DynamoDBTable(table_name=os.environ['GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME'])
-    dynamo_db.put_item(access_tokens)
+    dynamo_db.put_item(access_tokens.to_dict())
     
     return {
         "statusCode": 200,

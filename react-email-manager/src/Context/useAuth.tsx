@@ -1,6 +1,6 @@
 import { createContext, useEffect, useState } from "react";
-import { callbackSocialLogin } from "../Services/Auth/CallbackSocialLogin";
-import { getGoogleOauthTokens } from "../Services/Auth/GetGoogleOauthTokens"
+import { callbackSocialLogin } from "../Services/CallbackSocialLogin";
+import { getGoogleOauthTokens } from "../Services/GetGoogleOauthTokens"
 import type { UserProfile } from "../Types/User";
 import { decodeToken } from "../Helpers/DecodeJWT";
 import React from "react";

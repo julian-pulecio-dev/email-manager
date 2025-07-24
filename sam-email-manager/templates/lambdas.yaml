@@ -65,6 +65,62 @@ Resources:
               Header: Authorization
               ReauthorizeEvery: 0
 
+  SendEmailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.send_email.lambda_handler
+      Layers:
+        - !Ref RequestsLayerArn
+        - !Ref GmailLayerArn
+      Environment:
+        Variables:
+          GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /send_email
+            Method: POST
+
+  InterpretPrompt:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.interpret_prompt.lambda_handler
+      Layers:
+        - !Ref RequestsLayerArn
+        - !Ref VertexAILayerArn
+      Environment:
+        Variables:
+          GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
+          GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: !Ref GoogleOAuthAccessTokensTableName
+      Events:
+        Preflight:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /interpret_prompt
+            Method: OPTIONS
+            Auth:
+              Authorizer: NONE
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /interpret_prompt
+            Method: POST
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: !Ref GoogleOAuthAccessTokensTableArn
 
   GetGoogleOAuthTokensFunction:
     Type: AWS::Serverless::Function
@@ -73,6 +129,7 @@ Resources:
       Layers:
         - !Ref RequestsLayerArn
         - !Ref GmailLayerArn
+        - arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p312-cryptography:15
       Environment:
         Variables:
           GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
@@ -123,25 +180,6 @@ Resources:
           Properties:
             RestApiId: !Ref EmailManagerApi
             Path: /transform_prompt_to_json
-            Method: POST
-
-  SendEmailFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: functions.send_email.lambda_handler
-      Layers:
-        - !Ref RequestsLayerArn
-        - !Ref GmailLayerArn
-      Environment:
-        Variables:
-          GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
-          GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
-      Events:
-        Api:
-          Type: Api
-          Properties:
-            RestApiId: !Ref EmailManagerApi
-            Path: /send_email
             Method: POST
 
   SocialAuthCallbackFunction:
