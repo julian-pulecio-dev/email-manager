@@ -76,14 +76,33 @@ Resources:
         Variables:
           GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
           GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
+          GOOGLE_ACCOUNT_CREDENTIALS: '{{resolve:secretsmanager:dev/email_manager_account_credentials:SecretString}}'
+          GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: !Ref GoogleOAuthAccessTokensTableName
       Events:
+        Preflight:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /send_email
+            Method: OPTIONS
+            Auth:
+              Authorizer: NONE
         Api:
           Type: Api
           Properties:
             RestApiId: !Ref EmailManagerApi
             Path: /send_email
             Method: POST
-
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: !Ref GoogleOAuthAccessTokensTableArn
   InterpretPrompt:
     Type: AWS::Serverless::Function
     Properties:

@@ -5,7 +5,7 @@ const GoogleOAuthComponent: React.FC = () => {
     client_id: '736009949949-ekbue316djiqb7ljq2q75rh2vp6b9hq7.apps.googleusercontent.com',
     redirect_uri: 'http://localhost:5173/google-oauth-confirm-code',
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/gmail.readonly email profile openid",
+    scope: "https://www.googleapis.com/auth/gmail.modify email profile openid",
     access_type: "offline",
     prompt: "consent",
   });

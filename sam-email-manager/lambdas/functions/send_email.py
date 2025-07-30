@@ -1,142 +1,86 @@
-import json
+from ast import In
 import os
+import json
 import logging
-import requests
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from google.oauth2 import service_account
-import google.auth.transport.requests
+from src.utils.headers import get_headers
+from src.decorators.event_parser import EventParser
+from src.event_requests.interpret_prompt_request import InterpretPromptRequest
+from src.models.dynamo_db import DynamoDBTable
+from src.models.vertex_ia import VertexIA
+from src.models.email import Email
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-def get_access_token():
-    """Obtiene un access token usando la cuenta de servicio."""
-    credentials = service_account.Credentials.from_service_account_file(
-        'email-manager.json',
+INSTRUCTION_PROMPT = """
+    From the following text, generate a dictionary and ONLY a dictionary (with out the json word) that represents the author's desired email.
+    The dictionary must have the following format:
+    {{
+        "interpretation_status": "success", # Indicates if the prompt was successfully interpreted
+        "to": "<email_address>",
+        "subject": "<email_subject>",
+        "body": "<email_body>"
+    }}
+    If the prompt does not contain an email address, subject, or body, return an empty string for that field.
+    If the prompt is not clear, or is not related to an email ask the user for clarification following this format:
+    {{
+        "interpretation_status": "clarification_needed",
+        "clarification_message": "<Your clarification question>"
+    }}
+    return only the interpretation of the prompt, do not include any additional text.
+    The user prompt may not follow the exact format, so you should be able to extract the information from a natural language prompt if possible.
+    For example, if the user prompt is: "I need to send an email to john @example.com to schedule a meeting tomorrow at 10 AM.'",
+    the response should be:
+    {{
+        "interpretation_status": "success",
+        "to": "john@example.com",
+        "subject": "Meeting",
+        "body": "Let's meet tomorrow at 10 AM."
+    }}
+    For example, if the user prompt is: "I need to send an email to john@example.com to ask him about the interview.",
+    the response should be:
+    {{
+        "interpretation_status": "success",
+        "to": "john@example.com",
+        "subject": "Interview Update",
+        "body": "I wanted to follow up on my interview and see if there are any updates."
+    }}
+    For example, if the user prompt is: "I need to send an email to julia to ask her about the project status.",'",
+    the response should be:
+    {{
+        "interpretation_status": "clarification_needed",
+        "clarification_message": "can you provide the email address of julia?"
+    }}
+    the user prompt is: {prompt}"""
+
+@EventParser(request_class=InterpretPromptRequest)
+def lambda_handler(event:InterpretPromptRequest, context):
+    logger.info(f'event headers: {json.dumps(event.headers)}')
+    dynamo_db = DynamoDBTable(table_name=os.environ['GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME'])
+    logger.info(f'request user {event.user}')
+    dynamo_item = dynamo_db.get_item('email',event.user)
+    logger.info(f'dynamo item: {dynamo_item}')
+    vertex_ia = VertexIA(
         scopes=['https://www.googleapis.com/auth/cloud-platform'],
+        project_id='email-manager-445502',
+        location='us-central1',
+        model_id='gemini-2.0-flash-lite-001'
     )
-    request = google.auth.transport.requests.Request()
-    credentials.refresh(request)
-    return credentials.token
-
-def call_vertex(prompt):
-    logger.info(f"call vertex with prompt: {prompt[:50]}...")
-    """Envía el prompt al endpoint REST de Vertex AI y devuelve la respuesta."""
-    token = get_access_token()
-
-    logger.info(f"Token obtenido: {token[:10]}...")
-    # Personaliza estos valores:
-    project_id = 'email-manager-445502'  # recomendado pasarlo por variables de entorno
-    location = "us-central1"  # o tu región de Vertex AI
-    model_id = "gemini-2.5-pro"  # ejemplo con modelo generativo de texto
-
-    endpoint = (
-        f"https://{location}-aiplatform.googleapis.com/v1/projects/{project_id}"
-        f"/locations/{location}/publishers/google/models/{model_id}:generateContent"
+    
+    logger.info(f"Calling Vertex AI with prompt: {INSTRUCTION_PROMPT.format(prompt=event.prompt)}")
+    response = vertex_ia.call_vertex(INSTRUCTION_PROMPT.format(prompt=event.prompt))
+    logger.info(f'response vertex_ia : {response}')
+    email = Email(
+        to=response.get('to', ''),
+        subject=response.get('subject', ''),
+        body=response.get('body', ''),
+        google_oauth_access_token=dynamo_item.get('access_token', ''),
+        google_oauth_refresh_token=dynamo_item.get('refresh_token', '')
     )
-
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
+    result = email.send()
+    logger.info(f'Email sent successfully: {result}')
+    return {
+        "statusCode": 200,
+        "headers": get_headers(),
+        "body": json.dumps(result)
     }
-
-    body = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": prompt}]
-            }
-        ]
-    }
-    logger.info(f"Enviando solicitud a Vertex: {json.dumps(body)}")
-
-    try:
-        response = requests.post(endpoint, headers=headers, json=body)
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error al llamar a Vertex: {e}")
-        raise Exception(f"Error al llamar a Vertex: {e}")
-
-    logger.info(f"Response from Vertex: {response.status_code}, {response.text}")
-
-    if response.status_code != 200:
-        logger.error(f"Vertex error: {response.status_code}, {response.text}")
-        raise Exception(f"Vertex error: {response.status_code}, {response.text}")
-
-    prediction = response.json()
-    logger.info(f"Respuesta Vertex: {json.dumps(prediction)}")
-    return prediction
-
-def lambda_handler(event, context):
-    try:
-        # Obtener el código desde el query string
-        code = event["queryStringParameters"].get("code")
-        if not code:
-            return {"statusCode": 400, "body": json.dumps({"error": "No authorization code found"})}
-
-        logger.info(f"Authorization code recibido: {code[:10]}...")
-
-        # Datos necesarios para el intercambio
-        client_id = os.environ.get("GOOGLE_CLIENT_ID")
-        client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
-        redirect_uri = "https://8c46gyc5fj.execute-api.us-east-1.amazonaws.com/dev/hello_world"
-
-        # Preparar el body del POST
-        token_data = {
-            "code": code,
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "redirect_uri": redirect_uri,
-            "grant_type": "authorization_code"
-        }
-
-        token_response = requests.post(
-            "https://oauth2.googleapis.com/token",
-            data=token_data,
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
-        )
-
-        if token_response.status_code != 200:
-            logger.error(f"Fallo al intercambiar el código: {token_response.text}")
-            return {
-                "statusCode": token_response.status_code,
-                "body": token_response.text
-            }
-
-        tokens = token_response.json()
-        logger.info(f"Tokens recibidos: {json.dumps(tokens)}")
-
-        creds = Credentials(
-            token=tokens["access_token"],
-            refresh_token=tokens.get("refresh_token"),
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=client_id,
-            client_secret=client_secret
-        )
-
-        # Inicializar cliente de Gmail
-        service = build("gmail", "v1", credentials=creds)
-
-        # Obtener primeros 5 mensajes del inbox
-        results = service.users().messages().list(userId="me", maxResults=5).execute()
-        messages = results.get("messages", [])
-        logger.info(f"Mensajes obtenidos: {messages}")
-
-        logger.info(f"Event: {json.dumps(event)}")
-
-        prompt = "Dime un chiste corto."
-
-        gemini_response = call_vertex(prompt)
-
-        return {
-            "statusCode": 200,
-            "body": json.dumps(gemini_response),
-        }
-
-    except Exception as e:
-        logger.exception("Error intercambiando el código por tokens")
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
-        }

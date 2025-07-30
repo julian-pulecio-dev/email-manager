@@ -1,9 +1,14 @@
 import base64
 import json
+import logging
 from urllib.parse import parse_qs
 from dataclasses import dataclass
 from src.exceptions.invalid_request_exception import InvalidRequestException
 from src.exceptions.server_exception import ServerException
+
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 @dataclass
 class Event:
@@ -55,6 +60,7 @@ class Event:
         Returns:
             Event: An instance of the Event class.
         """
+        logger.info(f"Creating Event from lambda_event: {json.dumps(lambda_event)}")
         parameters = cls.__get_parameters(lambda_event)
         print(parameters)
         if not isinstance(parameters,dict):
@@ -67,6 +73,7 @@ class Event:
 
     @classmethod
     def __get_parameters(cls, lambda_event: dict):
+        logger.info(f"Extracting parameters from lambda_event: {json.dumps(lambda_event)}")
         """Determines the type of parameters to extract based on the HTTP method."""
 
         http_method = lambda_event.get('httpMethod')

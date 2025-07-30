@@ -2,8 +2,10 @@ import json
 import os
 import logging
 import requests
-from google.oauth2 import service_account
 import google.auth.transport.requests
+from google.oauth2 import service_account
+from src.exceptions.server_exception import ServerException
+from src.exceptions.invalid_request_exception import InvalidRequestException
 from dataclasses import dataclass
 
 logger = logging.getLogger()
@@ -36,8 +38,6 @@ class VertexIA:
         """Envía el prompt al endpoint REST de Vertex AI y devuelve la respuesta."""
         token = self.__get_access_token()
 
-        logger.info(f"Token obtenido: {token[:10]}...")
-        
         endpoint = (
             f"https://{self.location}-aiplatform.googleapis.com/v1/projects/{self.project_id}"
             f"/locations/{self.location}/publishers/google/models/{self.model_id}:generateContent"
@@ -48,58 +48,46 @@ class VertexIA:
             "Content-Type": "application/json",
         }
 
-        prompt_instruction = """
-            From the following text, generate ONLY one JSON object that represents the author's desired action.
-            The JSON must have the following format:
-
-            {
-            "type": "send_email" | "create_tag", // "send_email" if you want to send an email, "create_tag" if you want to tag emails.
-            "date": int, // Date in minutes from the current time (for example, "5" means in 5 minutes).
-            "title": string, // Title of the email or tag. If not specified, use a generic title like "Untitled".
-            "subject": string, // Subject of the email. If not specified, use the same value as "title".
-            "content": string // Message content or tag description.
-            }
-
-            Rules:
-            - Don't explain anything, just return the JSON.
-            - If the time is not specified, assume it is 0 (immediate).
-            - If the text is unclear, leave the fields blank except for "type".
-
-            Example:
-            Text: "Create a label to organize billing emails"
-            Response:
-            {
-            "type": "create_tag",
-            "date": 0,
-            "title": "Billing",
-            "subject": "Billing",
-            "content": "Label for billing emails"
-            }
-
-            Input text: " 
-        """
-
         body = {
             "contents": [
                 {
                     "role": "user",
-                    "parts": [{"text": prompt_instruction + prompt}]
+                    "parts": [{"text": prompt}]
                 }
             ]
         }
         logger.info(f"Enviando solicitud a Vertex: {json.dumps(body)}")
 
         try:
-            response = requests.post(endpoint, headers=headers, json=body)
+            response = requests.post(endpoint, headers=headers, json=body).json()
+            data = ''
+            logger.info(f"Response from Vertex: {response}")
+            for candidate in response.get('candidates', []):
+                if 'content' in candidate:
+                    content = candidate['content']
+                    if isinstance(content, dict) and 'parts' in content:
+                        for part in content['parts']:
+                            if 'text' in part:
+                                data += part['text']
+            data = data.replace("```json", "").replace("```", "")
+            logger.info(f"Data extracted from Vertex response: {data}")
+            data = json.loads(data)
+            logger.info(f"Parsed data: {data}")           
+            if data.get('interpretation_status') == 'success':
+                return data
+            if data.get('interpretation_status') == 'clarification_needed':
+                clarification_message = data.get('clarification_message', 'Please provide more details.')
+                logger.info(f'Clarification needed: {clarification_message}')
+                raise InvalidRequestException(clarification_message)
         except requests.exceptions.RequestException as e:
             logger.error(f"Error al llamar a Vertex: {e}")
-            raise Exception(f"Error al llamar a Vertex: {e}")
+            raise ServerException(f"Error al llamar a Vertex: {e}")
 
         logger.info(f"Response from Vertex: {response.status_code}, {response.text}")
 
         if response.status_code != 200:
             logger.error(f"Vertex error: {response.status_code}, {response.text}")
-            raise Exception(f"Vertex error: {response.status_code}, {response.text}")
+            raise ServerException(f"Vertex error: {response.status_code}, {response.text}")
 
         prediction = response.json()
         logger.info(f"Respuesta Vertex: {json.dumps(prediction)}")
