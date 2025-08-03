@@ -2,7 +2,7 @@ import React from "react";
 
 const GoogleOAuthComponent: React.FC = () => {  
   const params = new URLSearchParams({
-    client_id: '736009949949-ekbue316djiqb7ljq2q75rh2vp6b9hq7.apps.googleusercontent.com',
+    client_id: '68404229391-50kt67jb079h7fjabuppd6me4eth5932.apps.googleusercontent.com',
     redirect_uri: 'http://localhost:5173/google-oauth-confirm-code',
     response_type: "code",
     scope: "https://www.googleapis.com/auth/gmail.modify email profile openid",

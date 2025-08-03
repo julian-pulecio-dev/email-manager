@@ -2,6 +2,10 @@ from src.models.event import Event
 from src.exceptions.invalid_request_exception import InvalidRequestException
 from src.exceptions.server_exception import ServerException
 from dataclasses import dataclass
+from logging import getLogger
+
+logger = getLogger(__name__)
+logger.setLevel('DEBUG')
 
 
 @dataclass 

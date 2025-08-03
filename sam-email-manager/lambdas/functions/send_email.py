@@ -55,21 +55,25 @@ INSTRUCTION_PROMPT = """
 
 @EventParser(request_class=InterpretPromptRequest)
 def lambda_handler(event:InterpretPromptRequest, context):
-    logger.info(f'event headers: {json.dumps(event.headers)}')
     dynamo_db = DynamoDBTable(table_name=os.environ['GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME'])
-    logger.info(f'request user {event.user}')
     dynamo_item = dynamo_db.get_item('email',event.user)
-    logger.info(f'dynamo item: {dynamo_item}')
+    
     vertex_ia = VertexIA(
         scopes=['https://www.googleapis.com/auth/cloud-platform'],
-        project_id='email-manager-445502',
+        project_id='email-manager-467721',
         location='us-central1',
         model_id='gemini-2.0-flash-lite-001'
     )
     
-    logger.info(f"Calling Vertex AI with prompt: {INSTRUCTION_PROMPT.format(prompt=event.prompt)}")
-    response = vertex_ia.call_vertex(INSTRUCTION_PROMPT.format(prompt=event.prompt))
-    logger.info(f'response vertex_ia : {response}')
+    if event.file:
+        file_bytes = event.file.content
+        file_mime_type = event.file.content_type
+    else:
+        file_bytes = None
+        file_mime_type = None
+    response = vertex_ia.call_vertex(INSTRUCTION_PROMPT.format(prompt=event.prompt), file_bytes=file_bytes, mime_type=file_mime_type)
+
+    
     email = Email(
         to=response.get('to', ''),
         subject=response.get('subject', ''),
@@ -77,8 +81,9 @@ def lambda_handler(event:InterpretPromptRequest, context):
         google_oauth_access_token=dynamo_item.get('access_token', ''),
         google_oauth_refresh_token=dynamo_item.get('refresh_token', '')
     )
+    
     result = email.send()
-    logger.info(f'Email sent successfully: {result}')
+    
     return {
         "statusCode": 200,
         "headers": get_headers(),

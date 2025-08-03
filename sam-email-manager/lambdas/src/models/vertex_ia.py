@@ -2,6 +2,8 @@ import json
 import os
 import logging
 import requests
+import base64
+import codecs
 import google.auth.transport.requests
 from google.oauth2 import service_account
 from src.exceptions.server_exception import ServerException
@@ -24,7 +26,6 @@ class VertexIA:
         google_account_credentials = json.loads(GOOGLE_ACCOUNT_CREDENTIALS)
         if isinstance(google_account_credentials.get("private_key"), str):
             google_account_credentials["private_key"] = google_account_credentials["private_key"].replace("\\n", "\n")
-        logger.info(google_account_credentials)
         credentials = service_account.Credentials.from_service_account_info(
             google_account_credentials,
             scopes=self.scopes
@@ -32,63 +33,102 @@ class VertexIA:
         request = google.auth.transport.requests.Request()
         credentials.refresh(request)
         return credentials.token
-    
-    def call_vertex(self, prompt):
-        logger.info(f"call vertex with prompt: {prompt[:50]}...")
+
+    def call_vertex(self, prompt: str, file_bytes: bytes = None, mime_type: str = None):
         """Envía el prompt al endpoint REST de Vertex AI y devuelve la respuesta."""
         token = self.__get_access_token()
+        endpoint = self.__get_vertex_endpoint()
+        headers = self.__get_headers(token)
+        body = self.__get_body(prompt, file_bytes, mime_type)
 
-        endpoint = (
+        logger.info(f"Calling Vertex AI with body: {body}")
+
+        try:
+            response = requests.post(endpoint, headers=headers, json=body)
+            logger.info(f"Response from Vertex AI: {response.status_code} - {response.text}")
+            return self.__handle_response(response)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error al llamar a Vertex: {e}")
+            raise ServerException(f"Error al llamar a Vertex: {e}")
+    
+    def __get_vertex_endpoint(self):
+        """Construye el endpoint de Vertex AI."""
+        return (
             f"https://{self.location}-aiplatform.googleapis.com/v1/projects/{self.project_id}"
             f"/locations/{self.location}/publishers/google/models/{self.model_id}:generateContent"
         )
-
-        headers = {
+    
+    def __get_headers(self, token):
+        """Construye los headers necesarios para la solicitud a Vertex AI."""
+        return {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
 
-        body = {
+    def __get_body(self, prompt, file_bytes=None, mime_type=None):
+        parts = [{"text": prompt}]
+
+        if file_bytes and mime_type:
+            parts.append({
+                "inlineData": {
+                    "mimeType": mime_type,
+                    "data": file_bytes
+                }
+            })
+
+        return {
             "contents": [
                 {
                     "role": "user",
-                    "parts": [{"text": prompt}]
+                    "parts": parts
                 }
             ]
         }
-        logger.info(f"Enviando solicitud a Vertex: {json.dumps(body)}")
+    
+    def __handle_response(self, response):
+        """Handles the response from Vertex AI and extracts the text content."""
+        if response.status_code == 200:
+            return self.__handle_success_response(response)
+        return self.__handle_error_response(response)
+        
+    def __handle_success_response(self, response):
+        """Handles successful responses from Vertex AI."""
+        response_text = response.text.replace("```json", '').replace("```", '')
+        response = json.loads(response_text)
+        if 'candidates' not in response or len(response['candidates']) <= 0:
+            raise ServerException("No candidates found in Vertex AI response.")
+        
+        text_response = response['candidates'][0].get('content', {}).get('parts', [{}])[0].get('text', '')
+        
+        if not text_response:
+            raise ServerException("No text found in Vertex AI response.")
+    
+        json_response = self.__parse_json_from_text(text_response)
 
+        if json_response.get('interpretation_status') == 'clarification_needed':
+            raise InvalidRequestException(f"clarification needed. reason: {json_response.get('clarification_message')}")
+
+        return json_response
+    
+    def __handle_error_response(self, response):
+        """Handles error responses from Vertex AI."""
+        if response.status_code == 400:
+            raise InvalidRequestException(f'Bad request to Vertex AI: {response.text}')
+        elif response.status_code == 401:
+            raise ServerException(f"Unauthorized access to Vertex AI: {response.text}")
+        elif response.status_code == 403:
+            raise ServerException(f"Forbidden access to Vertex AI: {response.text}")
+        elif response.status_code == 404:
+            raise ServerException(f"Vertex AI endpoint not found: {response.text}")
+        else:
+            raise ServerException(f"Unexpected error from Vertex AI: {response.status_code}")
+    
+    def __parse_json_from_text(self, text):
+        """Parses a JSON object from a text string."""
         try:
-            response = requests.post(endpoint, headers=headers, json=body).json()
-            data = ''
-            logger.info(f"Response from Vertex: {response}")
-            for candidate in response.get('candidates', []):
-                if 'content' in candidate:
-                    content = candidate['content']
-                    if isinstance(content, dict) and 'parts' in content:
-                        for part in content['parts']:
-                            if 'text' in part:
-                                data += part['text']
-            data = data.replace("```json", "").replace("```", "")
-            logger.info(f"Data extracted from Vertex response: {data}")
-            data = json.loads(data)
-            logger.info(f"Parsed data: {data}")           
-            if data.get('interpretation_status') == 'success':
-                return data
-            if data.get('interpretation_status') == 'clarification_needed':
-                clarification_message = data.get('clarification_message', 'Please provide more details.')
-                logger.info(f'Clarification needed: {clarification_message}')
-                raise InvalidRequestException(clarification_message)
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error al llamar a Vertex: {e}")
-            raise ServerException(f"Error al llamar a Vertex: {e}")
-
-        logger.info(f"Response from Vertex: {response.status_code}, {response.text}")
-
-        if response.status_code != 200:
-            logger.error(f"Vertex error: {response.status_code}, {response.text}")
-            raise ServerException(f"Vertex error: {response.status_code}, {response.text}")
-
-        prediction = response.json()
-        logger.info(f"Respuesta Vertex: {json.dumps(prediction)}")
-        return prediction
+            json_response = json.loads(text)
+            if 'interpretation_status' not in json_response:
+                raise ServerException("Invalid JSON response from Vertex AI: 'interpretation_status' key not found.")
+            return json_response
+        except json.JSONDecodeError as e:
+            raise ServerException(f"Failed to parse JSON from text: {str(e)}")

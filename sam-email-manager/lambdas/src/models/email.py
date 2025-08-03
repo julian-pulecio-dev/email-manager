@@ -43,7 +43,6 @@ class Email:
         creds = self.__get_access_token()
         service = build("gmail", "v1", credentials=creds)
         message = self.__create_message(self.to, self.subject, self.body)
-        logger.info(f'Sending email to {self.to} with subject "{self.subject}"')
-
+        
         result = service.users().messages().send(userId='me', body=message).execute()
         return result

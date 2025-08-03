@@ -33,8 +33,8 @@ class EventParser:
         raise TypeError("Invalid Event Parser arguments")
 
     def _handle_request(self, event, context, **kwargs):
+        logger.info(f"EventParser _handle_request event: {event}")
         """Handles the Lambda event and parses it into a request object."""
-        logger.info(f"Received raw event from aws: {json.dumps(event)}")
         if event['httpMethod'] == 'OPTIONS':
             return {
                 'statusCode': 204,
@@ -42,15 +42,13 @@ class EventParser:
                 'body': ''
             }
         lambda_event = Event.from_lambda_event(event)
-        logger.info(f"Parsed event: {json.dumps(lambda_event.data)}")
         request = self.request_class.from_event(lambda_event)
+        logger.info(f"Parsed request: {request}")
         return self.__handle_request_errors(request, context, **kwargs)
         
     def __handle_request_errors(self, request: EventRequest, context, **kwargs):
         """Handles errors that may occur during request processing."""
         try:
-            logger.info(f"Processing request: {request}")
-            logger.info(f"excecuting function: {self.func.__name__}, with request: {request}, context: {context} and kwargs: {kwargs} ")
             return self.func(request, context, **kwargs)
         except InvalidRequestException as e:
             logger.error(f"Invalid request: {str(e)}")

@@ -15,7 +15,6 @@ def lambda_handler(event_request: SocialAuthCallbackRequest, context):
         code=event_request.code,
         provider=event_request.provider
     )
-    logger.info(f"Access tokens received: {response}")
     return {
         "statusCode": 200,
         "headers": get_headers(),

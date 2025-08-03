@@ -16,7 +16,6 @@ class DynamoDBTable:
     def put_item(self, item: dict):
         try:
             item = DynamoDBItem.from_dict(item)
-            logger.info(f'Put item into DynamoDB: {item}')
             return self.boto3_client.put_item(TableName=self.table_name, Item=item)
         except (ValueError, botocore.exceptions.ClientError) as e:
             raise ServerException(str(e))
