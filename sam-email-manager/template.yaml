@@ -34,10 +34,8 @@ Resources:
     Properties:
       Location: templates/lambdas.yaml
       Parameters:
-        RequestsLayerArn: !GetAtt Dependencies.Outputs.RequestsLayerArn
-        GmailLayerArn: !GetAtt Dependencies.Outputs.GmailLayerArn
-        VertexAILayerArn: !GetAtt Dependencies.Outputs.VertexAILayerArn
-        LambdaSRCLayerArn: !GetAtt Dependencies.Outputs.LambdaSRCLayerArn
+        CoreLayerArn: !GetAtt Dependencies.Outputs.CoreLayerArn
+        GoogleLayerArn: !GetAtt Dependencies.Outputs.GoogleLayerArn
         GoogleOAuthAccessTokensTableArn: !GetAtt DynamoDB.Outputs.GoogleOAuthAccessTokensTableArn
         GoogleOAuthAccessTokensTableName: !GetAtt DynamoDB.Outputs.GoogleOAuthAccessTokensTableName
         AuthUserPoolId: !GetAtt Cognito.Outputs.AuthUserPoolId

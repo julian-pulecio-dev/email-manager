@@ -1,18 +1,12 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Parameters:
-  RequestsLayerArn:
+  CoreLayerArn:
     Type: String
-    Description: The ARN of the Requests dependency layer.
-  GmailLayerArn:
+    Description: The ARN of the Core dependency layer.
+  GoogleLayerArn:
     Type: String
-    Description: The ARN of the Gmail API dependency layer.
-  VertexAILayerArn:
-    Type: String
-    Description: The ARN of the Vertex AI API dependency layer.
-  LambdaSRCLayerArn:
-    Type: String
-    Description: The ARN of the Lambda source dependency layer.
+    Description: The ARN of the Google API dependency layer.
   GoogleOAuthAccessTokensTableArn:
     Type: String
     Description: The ARN of the GoogleAccessTokensTable DynamoDB table
@@ -73,8 +67,8 @@ Resources:
     Properties:
       Handler: functions.send_email.lambda_handler
       Layers:
-        - !Ref RequestsLayerArn
-        - !Ref GmailLayerArn
+        - !Ref CoreLayerArn
+        - !Ref GoogleLayerArn
       Environment:
         Variables:
           GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
@@ -113,8 +107,8 @@ Resources:
     Properties:
       Handler: functions.interpret_prompt.lambda_handler
       Layers:
-        - !Ref RequestsLayerArn
-        - !Ref VertexAILayerArn
+        - !Ref CoreLayerArn
+        - !Ref GoogleLayerArn
       Environment:
         Variables:
           GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
@@ -152,8 +146,8 @@ Resources:
     Properties:
       Handler: functions.get_google_oauth_tokens.lambda_handler
       Layers:
-        - !Ref RequestsLayerArn
-        - !Ref GmailLayerArn
+        - !Ref CoreLayerArn
+        - !Ref GoogleLayerArn
         - arn:aws:lambda:us-east-1:770693421928:layer:Klayers-p312-cryptography:15
       Environment:
         Variables:
@@ -193,7 +187,7 @@ Resources:
     Properties:
       Handler: functions.social_auth_callback.lambda_handler
       Layers:
-        - !Ref RequestsLayerArn
+        - !Ref CoreLayerArn
       Environment:
         Variables:
           EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID: !Ref AuthUserPoolClientId

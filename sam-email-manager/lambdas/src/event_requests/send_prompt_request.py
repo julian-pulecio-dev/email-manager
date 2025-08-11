@@ -7,7 +7,7 @@ logger = getLogger(__name__)
 logger.setLevel('DEBUG')
 
 @dataclass
-class InterpretPromptRequest(EventRequest):
+class SendPromptRequest(EventRequest):
     """""
     Request class for handling prompt interpretation.
     """""

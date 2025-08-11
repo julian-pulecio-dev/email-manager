@@ -1,55 +1,28 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Resources:
-  RequestsLayer:
+  CoreLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
       LayerName: requests-dependencies
-      ContentUri: ../dependencies/requests
-      Description: Dependencies for HelloWorldFunction
+      ContentUri: ../dependencies/core.zip
       CompatibleRuntimes:
         - python3.12
 
-  GmailLayer:
+  GoogleLayer:
     Type: AWS::Serverless::LayerVersion
     Properties:
-      LayerName: gmail-dependencies
-      Description: Dependencies for Gmail API
-      ContentUri: ../dependencies/gmail
-      CompatibleRuntimes:
-        - python3.12
-
-  VertexAILayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName: vertex-ai-dependencies
-      Description: Dependencies for Vertex AI API
-      ContentUri: ../dependencies/vertex_ai
-      CompatibleRuntimes:
-        - python3.12
-
-  LambdaSRCLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName: lambda-src-dependencies
-      Description: Dependencies for Lambda source
-      ContentUri: ../dependencies/lambda_src
+      LayerName: google-dependencies
+      Description: Dependencies for Google API
+      ContentUri: ../dependencies/google.zip
       CompatibleRuntimes:
         - python3.12
 
 Outputs:
-  RequestsLayerArn:
-    Description: The ARN of the Requests dependency layer.
-    Value: !Ref RequestsLayer
+  CoreLayerArn:
+    Description: The ARN of the Core dependency layer.
+    Value: !Ref CoreLayer
 
-  GmailLayerArn:
-    Description: The ARN of the Gmail API dependency layer.
-    Value: !Ref GmailLayer
-
-  VertexAILayerArn:
-    Description: The ARN of the Vertex AI API dependency layer.
-    Value: !Ref VertexAILayer
-  
-  LambdaSRCLayerArn:
-    Description: The ARN of the Lambda source dependency layer.
-    Value: !Ref LambdaSRCLayer
+  GoogleLayerArn:
+    Description: The ARN of the Google API dependency layer.
+    Value: !Ref GoogleLayer

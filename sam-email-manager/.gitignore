@@ -245,3 +245,6 @@ $RECYCLE.BIN/
 
 .aws-sam/*
 .aws-sam
+
+.zip
+*.zip
