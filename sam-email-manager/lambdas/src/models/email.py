@@ -10,17 +10,11 @@ from email import encoders
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from src.utils.base64 import fix_base64_padding
+from src.models.attachment import Attachment
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-
-@dataclass
-class Attachment:
-    filename: str
-    content: str | bytes  # Puede ser base64 (str) o bytes
-    mimetype: str = "application/octet-stream"
 
 
 @dataclass
@@ -69,19 +63,6 @@ class Email:
 
         raw_message = base64.urlsafe_b64encode(message.as_bytes())
         return {'raw': raw_message.decode('utf-8')}
-
-
-    def __get_binary_content(self, content: str | bytes) -> bytes:
-        if isinstance(content, str):
-            try:
-                return base64.b64decode(content)
-            except Exception as e:
-                logger.error("Error decoding base64 attachment: %s", e)
-                raise ValueError("El contenido base64 del archivo adjunto no es válido.")
-        elif isinstance(content, bytes):
-            return content
-        else:
-            raise ValueError("El contenido del archivo adjunto debe ser str (base64) o bytes.")
 
     def __get_access_token(self):
         return Credentials(

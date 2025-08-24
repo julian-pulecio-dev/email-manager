@@ -248,3 +248,5 @@ $RECYCLE.BIN/
 
 .zip
 *.zip
+
+**/.terraform/*

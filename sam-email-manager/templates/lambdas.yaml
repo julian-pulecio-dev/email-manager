@@ -13,6 +13,12 @@ Parameters:
   GoogleOAuthAccessTokensTableName:
     Type: String
     Description: The name of the GoogleAccessTokensTable DynamoDB table
+  GmailHistoryIdTableArn:
+    Type: String
+    Description: The ARN of the GmailHistoryIdTable DynamoDB table
+  GmailHistoryIdTableName:
+    Type: String
+    Description: The name of the GmailHistoryIdTable DynamoDB table
   AuthUserPoolId:
     Type: String
     Description: The ID of the Cognito User Pool.
@@ -102,45 +108,7 @@ Resources:
                 - dynamodb:UpdateItem
                 - dynamodb:DeleteItem
               Resource: !Ref GoogleOAuthAccessTokensTableArn
-  InterpretPrompt:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: functions.interpret_prompt.lambda_handler
-      Layers:
-        - !Ref CoreLayerArn
-        - !Ref GoogleLayerArn
-      Environment:
-        Variables:
-          GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
-          GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
-          GOOGLE_ACCOUNT_CREDENTIALS: '{{resolve:secretsmanager:dev/email_manager_account_credentials:SecretString}}'
-          GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: !Ref GoogleOAuthAccessTokensTableName
-      Events:
-        Preflight:
-          Type: Api
-          Properties:
-            RestApiId: !Ref EmailManagerApi
-            Path: /interpret_prompt
-            Method: OPTIONS
-            Auth:
-              Authorizer: NONE
-        Api:
-          Type: Api
-          Properties:
-            RestApiId: !Ref EmailManagerApi
-            Path: /interpret_prompt
-            Method: POST
-      Policies:
-        - Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:GetItem
-                - dynamodb:PutItem
-                - dynamodb:UpdateItem
-                - dynamodb:DeleteItem
-              Resource: !Ref GoogleOAuthAccessTokensTableArn
-
+  
   GetGoogleOAuthTokensFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -154,6 +122,8 @@ Resources:
           GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
           GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
           GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: !Ref GoogleOAuthAccessTokensTableName
+          GMAIL_WATCH_PUB_SUB_NAME: 'projects/email-manager-467721/topics/my-topic'
+          GMAIL_HISTORY_ID_TABLE_NAME: !Ref GmailHistoryIdTableName
       Events:
         Preflight:
           Type: Api
@@ -181,7 +151,16 @@ Resources:
                 - dynamodb:UpdateItem
                 - dynamodb:DeleteItem
               Resource: !Ref GoogleOAuthAccessTokensTableArn
-
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: !Ref GmailHistoryIdTableArn
+              
   SocialAuthCallbackFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -212,3 +191,53 @@ Resources:
             Method: POST
             Auth:
               Authorizer: NONE
+  
+  ReceiveEmailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.receive_email.lambda_handler
+      Layers:
+        - !Ref CoreLayerArn
+      Environment:
+        Variables:
+          GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
+          GOOGLE_ACCOUNT_CREDENTIALS: '{{resolve:secretsmanager:dev/email_manager_account_credentials:SecretString}}'
+          GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: !Ref GoogleOAuthAccessTokensTableName
+          GMAIL_HISTORY_ID_TABLE_NAME: !Ref GmailHistoryIdTableName
+      Events:
+        Preflight:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /receive_email
+            Method: OPTIONS
+            Auth:
+              Authorizer: NONE
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /receive_email
+            Method: POST
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: !Ref GoogleOAuthAccessTokensTableArn
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+              Resource: !Ref GmailHistoryIdTableArn
