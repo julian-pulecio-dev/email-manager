@@ -4,10 +4,10 @@ import json
 import logging
 from src.utils.headers import get_headers
 from src.decorators.event_parser import EventParser
-from src.event_requests.send_prompt_request import SendPromptRequest
+from src.event_requests.send_email_request import SendEmailRequest
 from src.models.dynamo_db import DynamoDBTable
 from src.models.vertex_ia import VertexIA
-from src.models.email import Email, Attachment
+from src.models.email import Email
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -55,8 +55,8 @@ INSTRUCTION_PROMPT = """
     }}
     the user prompt is: {prompt}"""
 
-@EventParser(request_class=SendPromptRequest)
-def lambda_handler(event:SendPromptRequest, context):
+@EventParser(request_class=SendEmailRequest)
+def lambda_handler(event:SendEmailRequest, context):
     dynamo_db = DynamoDBTable(table_name=os.environ['GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME'])
     dynamo_item = dynamo_db.get_item('email',event.user)
     
@@ -66,17 +66,8 @@ def lambda_handler(event:SendPromptRequest, context):
         location='us-central1',
         model_id='gemini-2.0-flash-lite-001'
     )
-    
-    if event.file:
-        file_bytes = event.file.content
-        file_mime_type = event.file.content_type
-    else:
-        file_bytes = None
-        file_mime_type = None
-    response = vertex_ia.call_vertex(INSTRUCTION_PROMPT.format(prompt=event.prompt), file_bytes=file_bytes, mime_type=file_mime_type)
 
-    if event.file:
-        attachment = Attachment(filename=event.file.filename, content=str(event.file.content))
+    response = vertex_ia.call_vertex(INSTRUCTION_PROMPT.format(prompt=event.prompt), files=event.attachments)
 
     email = Email(
         to=response.get('to', ''),
@@ -84,9 +75,7 @@ def lambda_handler(event:SendPromptRequest, context):
         body=response.get('body', ''),
         google_oauth_access_token=dynamo_item.get('access_token', ''),
         google_oauth_refresh_token=dynamo_item.get('refresh_token', ''),
-        attachments=[
-            attachment
-        ]
+        attachments=event.attachments
     )
     
     result = email.send()

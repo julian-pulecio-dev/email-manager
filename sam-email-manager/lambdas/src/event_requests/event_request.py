@@ -20,6 +20,7 @@ class EventRequest:
             Request: An instance of the Request class.
         """
         try:
+            logger.info(f"Creating {cls.__name__} from event data: {event.data}")
             instance = cls(**event.data)
             instance.__set_headers(event.headers)
             instance.__set_user(event.get_user())

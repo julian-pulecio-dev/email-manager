@@ -3,21 +3,25 @@ import { interpretPrompt } from '../Services/InterpretPrompt';
 
 const PromptBoxComponent = () => {
   const [texto, setText] = useState('');
-  const [archivo, setArchivo] = useState(null);
+  const [archivos, setArchivos] = useState([]); // ahora es un arreglo
 
   const handleTextChange = (e) => {
     setText(e.target.value);
   };
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    setArchivo(file);
+    const nuevosArchivos = Array.from(e.target.files); // convertir FileList en array
+    setArchivos((prev) => [...prev, ...nuevosArchivos]);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const arrayBuffer = reader.result;
-    };
-    reader.readAsArrayBuffer(file);
+    // Si quieres leerlos (ejemplo: para previews o validaciones)
+    nuevosArchivos.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const arrayBuffer = reader.result;
+        // podrías hacer algo con el contenido si lo necesitas
+      };
+      reader.readAsArrayBuffer(file);
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -30,9 +34,10 @@ const PromptBoxComponent = () => {
 
     const formData = new FormData();
     formData.append("prompt", texto);
-    if (archivo) {
-      formData.append("file", archivo);
-    }
+
+    archivos.forEach((file, index) => {
+      formData.append("files", file); // puedes usar "files[]" si el backend lo espera así
+    });
 
     try {
       const response = await interpretPrompt(formData);
@@ -44,7 +49,7 @@ const PromptBoxComponent = () => {
 
   return (
     <div className="formulario-container">
-      <h2>Enviar Prompt con Archivo</h2>
+      <h2>Enviar Prompt con Archivos</h2>
       <form onSubmit={handleSubmit} encType="multipart/form-data">
         <div className="textarea-container">
           <textarea
@@ -57,8 +62,17 @@ const PromptBoxComponent = () => {
         </div>
 
         <div className="file-input-container">
-          <input type="file" onChange={handleFileChange} />
+          <input type="file" multiple onChange={handleFileChange} />
         </div>
+
+        {/* Mostrar los archivos seleccionados */}
+        {archivos.length > 0 && (
+          <ul>
+            {archivos.map((file, idx) => (
+              <li key={idx}>{file.name}</li>
+            ))}
+          </ul>
+        )}
 
         <button type="submit" className="submit-button">
           Enviar

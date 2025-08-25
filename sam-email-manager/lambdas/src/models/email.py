@@ -10,7 +10,7 @@ from email import encoders
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from src.utils.base64 import fix_base64_padding
-from src.models.attachment import Attachment
+from src.models.file import File
 
 
 logger = logging.getLogger()
@@ -24,7 +24,7 @@ class Email:
     body: str
     google_oauth_access_token: str
     google_oauth_refresh_token: str
-    attachments: list[Attachment] = None
+    attachments: list[File] = None
 
     def __create_message(self) -> dict:
         # Crear mensaje multipart
@@ -36,30 +36,27 @@ class Email:
         msg = MIMEText(self.body, "plain")
         message.attach(msg)
 
-        # Adjuntos
-        for attachment in self.attachments or []:
-            try:
-                fixed_base64 = fix_base64_padding(attachment.content)
-                file_bytes = base64.b64decode(fixed_base64)
+        for attachment in self.attachments or []:    
+            fixed_base64 = fix_base64_padding(attachment.content)
+            file_bytes = base64.b64decode(fixed_base64)
 
-                mime_type, _ = mimetypes.guess_type(attachment.filename)
-                if mime_type is None:
-                    mime_type = "application/octet-stream"
+            mime_type, _ = mimetypes.guess_type(attachment.filename)
+            if mime_type is None:
+                mime_type = "application/octet-stream"
 
-                main_type, sub_type = mime_type.split("/", 1)
+            main_type, sub_type = mime_type.split("/", 1)
 
-                part = MIMEBase(main_type, sub_type)
-                part.set_payload(file_bytes)
+            part = MIMEBase(main_type, sub_type)
+            part.set_payload(file_bytes)
 
-                encoders.encode_base64(part)
-                part.add_header(
-                    "Content-Disposition",
-                    f'attachment; filename="{attachment.filename}"'
-                )
+            encoders.encode_base64(part)
+            encoders.encode_base64(part)
+            part.add_header(
+                "Content-Disposition",
+                f'attachment; filename="{attachment.filename}"'
+            )
 
-                message.attach(part)
-            except Exception as e:
-                logger.error(f"Error adjuntando {attachment.filename}: {e}")
+            message.attach(part)
 
         raw_message = base64.urlsafe_b64encode(message.as_bytes())
         return {'raw': raw_message.decode('utf-8')}

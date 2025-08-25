@@ -11,7 +11,6 @@ from werkzeug.test import EnvironBuilder
 from werkzeug.formparser import parse_form_data
 
 from src.exceptions.invalid_request_exception import InvalidRequestException
-from src.exceptions.server_exception import ServerException
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -83,32 +82,27 @@ class Event:
 
         parsed_params = {**query_params} if query_params else {}
         for key, values in multi_value_params.items():
-            if len(values) == 1:
-                parsed_params[key] = values[0]
-            else:
-                parsed_params[key] = values
+            parsed_params[key] = values if len(values) > 1 else values[0]
 
         return parsed_params
 
     @classmethod
     def __get_body_parameters(cls, lambda_event: dict) -> dict:
         content_type = get_case_insensitive_value(lambda_event.get('headers', {}), 'content-type')
-        cls.last_content_type = content_type  # Guardar content-type
+        cls.last_content_type = content_type
 
         body = lambda_event.get('body', '')
         body_len = len(body)
 
         if lambda_event.get('isBase64Encoded', False):
-            
             body = base64.b64decode(body)
 
-        
         if 'application/json' in content_type:
-                return json.loads(body)
+            return json.loads(body)
         elif 'multipart/form-data' in content_type:
             return cls.__get_multipart_form_data(body, body_len)
         elif 'application/x-www-form-urlencoded' in content_type:
-                return {k: v[0] if len(v) == 1 else v for k, v in parse_qs(body).items()}
+            return {k: v[0] if len(v) == 1 else v for k, v in parse_qs(body).items()}
         else:
             return body
 
@@ -117,6 +111,7 @@ class Event:
         content_type = cls.last_content_type
         if not content_type.startswith("multipart/form-data"):
             raise InvalidRequestException("Invalid content-type for multipart parsing")
+
         bytes_body = BytesIO(body)
         builder = EnvironBuilder(
             method="POST",
@@ -128,23 +123,24 @@ class Event:
         request = Request(env)
 
         _, form, files = parse_form_data(env)
-
         logger.info(f"Parsed form data: {form}")
 
         result = {}
 
         for key in form:
-            result[key] = form.get(key)
+            result[key] = form.getlist(key) if len(form.getlist(key)) > 1 else form.get(key)
 
         for key in files:
-            file = files[key]
-            content_file = file.read()
-            content_b64 = base64.b64encode(content_file)
-            result[key] = {
-                'filename': file.filename,
-                'content': content_b64,
-                'content_type': file.content_type
-            }
+            file_list = files.getlist(key)
+            result[key] = []
+            for file in file_list:
+                content_file = file.read()
+                content_b64 = base64.b64encode(content_file).decode("utf-8")
+                result[key].append({
+                    'filename': file.filename,
+                    'content': content_b64,
+                    'content_type': file.content_type
+                })
 
         return result
 

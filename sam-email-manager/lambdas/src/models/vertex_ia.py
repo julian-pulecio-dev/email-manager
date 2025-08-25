@@ -2,12 +2,12 @@ import json
 import os
 import logging
 import requests
-import base64
-import codecs
+from typing import List
 import google.auth.transport.requests
 from google.oauth2 import service_account
 from src.exceptions.server_exception import ServerException
 from src.exceptions.invalid_request_exception import InvalidRequestException
+from src.models.file import File
 from dataclasses import dataclass
 
 logger = logging.getLogger()
@@ -34,12 +34,12 @@ class VertexIA:
         credentials.refresh(request)
         return credentials.token
 
-    def call_vertex(self, prompt: str, file_bytes: bytes = None, mime_type: str = None):
+    def call_vertex(self, prompt: str, files: List[File] = []):
         """Envía el prompt al endpoint REST de Vertex AI y devuelve la respuesta."""
         token = self.__get_access_token()
         endpoint = self.__get_vertex_endpoint()
         headers = self.__get_headers(token)
-        body = self.__get_body(prompt, file_bytes, mime_type)
+        body = self.__get_body(prompt, files)
 
         logger.info(f"Calling Vertex AI with body: {body}")
 
@@ -65,14 +65,14 @@ class VertexIA:
             "Content-Type": "application/json",
         }
 
-    def __get_body(self, prompt, file_bytes=None, mime_type=None):
+    def __get_body(self, prompt, files: List[File]=[]):
         parts = [{"text": prompt}]
 
-        if file_bytes and mime_type:
+        for file in files:
             parts.append({
                 "inlineData": {
-                    "mimeType": mime_type,
-                    "data": file_bytes
+                    "mimeType": file.content_type,
+                    "data": file.content
                 }
             })
 
