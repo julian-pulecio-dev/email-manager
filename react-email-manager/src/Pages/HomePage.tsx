@@ -1,6 +1,7 @@
 import CognitoLoginComponent from '../Components/CognitoLoginComponent';
 import GoogleOAuthComponent from "../Components/GoogleOAuthComponent";
 import PromptBoxComponent from '../Components/PromptBoxComponent';
+import CreateLabelComponent from '../Components/CreateLabelComponent';
 
 const HomePage = () => {
   return (
@@ -9,6 +10,7 @@ const HomePage = () => {
       <CognitoLoginComponent />
       <GoogleOAuthComponent />
       <PromptBoxComponent />
+      <CreateLabelComponent />
     </div>
   );
 };

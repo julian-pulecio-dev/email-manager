@@ -19,6 +19,12 @@ Parameters:
   GmailHistoryIdTableName:
     Type: String
     Description: The name of the GmailHistoryIdTable DynamoDB table
+  GmailCustomLabelsTableArn:
+    Type: String
+    Description: The ARN of the GmailCustomLabelsTable DynamoDB table
+  GmailCustomLabelsTableName:
+    Type: String
+    Description: The name of the GmailCustomLabelsTable DynamoDB table
   AuthUserPoolId:
     Type: String
     Description: The ID of the Cognito User Pool.
@@ -205,6 +211,7 @@ Resources:
           GOOGLE_ACCOUNT_CREDENTIALS: '{{resolve:secretsmanager:dev/email_manager_account_credentials:SecretString}}'
           GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: !Ref GoogleOAuthAccessTokensTableName
           GMAIL_HISTORY_ID_TABLE_NAME: !Ref GmailHistoryIdTableName
+          GMAIL_CUSTOM_LABELS_TABLE_NAME: !Ref GmailCustomLabelsTableName
       Events:
         Preflight:
           Type: Api
@@ -230,6 +237,7 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:PutItem
                 - dynamodb:UpdateItem
+                - dynamodb:Scan
                 - dynamodb:DeleteItem
               Resource: !Ref GoogleOAuthAccessTokensTableArn
         - Version: '2012-10-17'
@@ -239,5 +247,79 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:PutItem
                 - dynamodb:UpdateItem
+                - dynamodb:Scan
                 - dynamodb:DeleteItem
               Resource: !Ref GmailHistoryIdTableArn
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Scan
+                - dynamodb:DeleteItem
+              Resource: !Ref GmailCustomLabelsTableArn
+
+  CreateLabelFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: functions.create_label.lambda_handler
+      Layers:
+        - !Ref CoreLayerArn
+      Environment:
+        Variables:
+          GOOGLE_CLIENT_ID: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_id}}'
+          GOOGLE_CLIENT_SECRET: '{{resolve:secretsmanager:dev/email_manager_client_credentials:SecretString:email_manager_client_secret}}'
+          GOOGLE_ACCOUNT_CREDENTIALS: '{{resolve:secretsmanager:dev/email_manager_account_credentials:SecretString}}'
+          GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: !Ref GoogleOAuthAccessTokensTableName
+          GMAIL_HISTORY_ID_TABLE_NAME: !Ref GmailHistoryIdTableName
+          GMAIL_CUSTOM_LABELS_TABLE_NAME: !Ref GmailCustomLabelsTableName
+      Events:
+        Preflight:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /create_label
+            Method: OPTIONS
+            Auth:
+              Authorizer: NONE
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref EmailManagerApi
+            Path: /create_label
+            Method: POST
+            Auth:
+              Authorizer: NONE
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Scan
+                - dynamodb:DeleteItem
+              Resource: !Ref GoogleOAuthAccessTokensTableArn
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Scan
+                - dynamodb:DeleteItem
+              Resource: !Ref GmailHistoryIdTableArn
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:Scan
+                - dynamodb:DeleteItem
+              Resource: !Ref GmailCustomLabelsTableArn

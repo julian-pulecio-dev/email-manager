@@ -28,6 +28,20 @@ class DynamoDBTable:
             return DynamoDBItem.to_dict(item) if item else None
         except (ValueError, botocore.exceptions.ClientError) as e:
             raise ServerException(str(e))
+        except botocore.exceptions.ClientError as e:
+            raise ServerException(str(e))
+
+    def scan_items(self, key_name:str, key_value: str):
+        try:
+            response = self.boto3_client.scan(
+                TableName=self.table_name,
+                FilterExpression=f'{key_name} = :{key_name}_val',
+                ExpressionAttributeValues={f':{key_name}_val': {'S': key_value}}
+            )
+            items = response.get("Items", [])
+            return [DynamoDBItem.to_dict(item) for item in items]
+        except botocore.exceptions.ClientError as e:
+            raise ServerException(str(e))
 
 
 class DynamoDBItem:

@@ -48,7 +48,7 @@ class GmailClient:
             logger.error(f"Error al obtener el profile de Gmail: {e}")
             return None
 
-    def get_messages_from_history(self, history_id):
+    def get_messages_from_history(self, history_id) -> list[GmailHistoryEvent]:
         history_events = self.service.users().history().list(
             userId="me",
             startHistoryId=history_id
