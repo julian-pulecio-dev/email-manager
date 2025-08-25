@@ -7,6 +7,7 @@ from src.event_requests.recieve_email_request import ReceiveEmailRequest
 from src.models.gmail_client import GmailClient
 from src.models.dynamo_db import DynamoDBTable
 from src.models.vertex_ia import VertexIA
+from src.models.gmail_label import GmailLabel
 from src.utils.headers import get_headers
 
 logger = logging.getLogger()
@@ -70,39 +71,37 @@ def lambda_handler(event:ReceiveEmailRequest, context):
     custom_labels_table = DynamoDBTable(table_name=os.environ['GMAIL_CUSTOM_LABELS_TABLE_NAME'])
     custom_labels = custom_labels_table.scan_items('email', event.email_address)
 
+    logger.info(f'Custom labels retrieved: {custom_labels}')
+
     categories = {lbl['title']: lbl['instruction'] for lbl in custom_labels}
 
     logger.info(f'Custom labels retrieved: {categories}')
 
-    messages = []
-    for gmail_message in gmail_messages:
-        for message in gmail_message.messages_added:
-            messages.append(message)
+    vertex_ia = VertexIA(
+        scopes=['https://www.googleapis.com/auth/cloud-platform'],
+        project_id='email-manager-467721',
+        location='us-central1',
+        model_id='gemini-2.0-flash-lite-001'
+    )
 
-    responses = []
-    for message in messages:
-        email = {
-            "body_plain": message.body_plain,
-            "subject": message.subject,
-            "from": message.sender,
-            "date": message.date
-        }
+    gmail_label = GmailLabel(
+        google_oauth_access_token=google_access_item.get('access_token', ''),
+        google_oauth_refresh_token=google_access_item.get('refresh_token', '')
+    )
 
-        vertex_ia = VertexIA(
-            scopes=['https://www.googleapis.com/auth/cloud-platform'],
-            project_id='email-manager-467721',
-            location='us-central1',
-            model_id='gemini-2.0-flash-lite-001'
-        )
+    for message in gmail_messages:
+        instruction =  INSTRUCTION_PROMPT.format(email=json.dumps(message.to_dict()), categories=json.dumps(categories))
+        logger.info(f'INSTRUCTION_PROMPT: {instruction}')
 
-        logger.info(f'INSTRUCTION_PROMPT: {INSTRUCTION_PROMPT.format(email=json.dumps(email), categories=json.dumps(categories))}')
-    
+        response = vertex_ia.call_vertex(instruction)
+        logger.info(f'Vertex IA response: {response}')
 
-        responses.append(vertex_ia.call_vertex(INSTRUCTION_PROMPT.format(email=json.dumps(email), categories=json.dumps(categories))))
+        labels_ids = [label['label_id'] for label in custom_labels if label['title'] in response.get('labels', [])]
+        gmail_label.move_message_to_label(message.id, labels_ids)
 
     return {
         "statusCode": 200,
         "headers": get_headers(),
-        "body": json.dumps({"message": "Email received successfully", "responses": responses})
+        "body": json.dumps({"message": "Email received successfully"})
     }
 
