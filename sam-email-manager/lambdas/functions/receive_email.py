@@ -26,6 +26,7 @@ INSTRUCTION_PROMPT = """
     - If no category matches, return "labels": [].
     - Do not include any text, comments, or code block markers.
     - Match categories by analyzing subject, body, sender, or metadata.
+    - The files attached to this prompt are the attachments of the email analize them to find relevant information.
     - Example:
     Email:
     {{
@@ -93,7 +94,7 @@ def lambda_handler(event:ReceiveEmailRequest, context):
         instruction =  INSTRUCTION_PROMPT.format(email=json.dumps(message.to_dict()), categories=json.dumps(categories))
         logger.info(f'INSTRUCTION_PROMPT: {instruction}')
 
-        response = vertex_ia.call_vertex(instruction)
+        response = vertex_ia.call_vertex(instruction, message.attachments)
         logger.info(f'Vertex IA response: {response}')
 
         labels_ids = [label['label_id'] for label in custom_labels if label['title'] in response.get('labels', [])]

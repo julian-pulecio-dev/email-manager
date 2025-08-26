@@ -2,6 +2,7 @@ import json
 import os
 import logging
 import requests
+import base64
 from typing import List
 import google.auth.transport.requests
 from google.oauth2 import service_account

@@ -9,4 +9,4 @@ class File:
     """Represents a file with its name and content."""
     filename: str
     content: str
-    content_type: str 
+    content_type: str

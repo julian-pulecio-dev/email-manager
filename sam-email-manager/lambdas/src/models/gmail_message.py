@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Any, Dict, Tuple
 from google.oauth2.credentials import Credentials
+from src.models.file import File
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import base64
@@ -92,7 +93,7 @@ class GmailMessage:
         Extrae cuerpo plain/html y adjuntos de manera recursiva.
         """
         body_plain, body_html = None, None
-        attachments: List[Dict[str, Any]] = []
+        attachments: List[File] = []
 
         def walk_parts(part: dict):
             nonlocal body_plain, body_html, attachments
@@ -124,11 +125,11 @@ class GmailMessage:
                     file_data = self._decode_base64url(att["data"])
 
                 attachments.append(
-                    {
-                        "filename": filename,
-                        "mimeType": mime_type,
-                        "data": file_data,
-                    }
+                    File(
+                        filename=filename,
+                        content=base64.b64encode(file_data).decode("utf-8"),
+                        content_type=mime_type
+                    )
                 )
 
             # Caso: partes anidadas
@@ -148,7 +149,6 @@ class GmailMessage:
             "label_ids": self.label_ids,
             "body_plain": self.body_plain,
             "body_html": self.body_html,
-            "attachments": self.attachments,
             "subject": self.subject,
             "from": self.sender,
             "to": self.to,
