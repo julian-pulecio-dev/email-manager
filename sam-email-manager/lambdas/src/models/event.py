@@ -92,13 +92,18 @@ class Event:
         cls.last_content_type = content_type
 
         body = lambda_event.get('body', '')
-        body_len = len(body)
+        if body is None:
+            body_len = 0
+        else:
+            body_len = len(body)
 
         if lambda_event.get('isBase64Encoded', False):
             body = base64.b64decode(body)
 
         if 'application/json' in content_type:
-            return json.loads(body)
+            if body:
+                return json.loads(body)
+            return {}
         elif 'multipart/form-data' in content_type:
             return cls.__get_multipart_form_data(body, body_len)
         elif 'application/x-www-form-urlencoded' in content_type:
@@ -108,6 +113,8 @@ class Event:
 
     @classmethod
     def __get_multipart_form_data(cls, body: bytes, body_len: int) -> dict:
+        logger.info(body)
+        logger.info('type of body: ' + str(type(body)))
         content_type = cls.last_content_type
         if not content_type.startswith("multipart/form-data"):
             raise InvalidRequestException("Invalid content-type for multipart parsing")

@@ -41,13 +41,13 @@ class GmailLabel:
             return label
 
         except HttpError as http_err:
-            raise ServerException("Error HTTP al crear etiqueta", http_err)
+            raise ServerException(f"Error HTTP al crear etiqueta: {str(http_err)}")
 
         except RefreshError as refresh_err:
-            raise ServerException("Error de autenticación al crear etiqueta", refresh_err)
+            raise ServerException(f"Error de autenticación al crear etiqueta: {str(refresh_err)}")
 
         except Exception as e:
-            raise ServerException("Error inesperado al crear etiqueta", e)
+            raise ServerException(f"Error inesperado al crear etiqueta: {str(e)}")
 
 
     def move_message_to_label(self, message_id: str, label_ids: List[str]):
