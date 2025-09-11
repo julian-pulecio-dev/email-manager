@@ -11,7 +11,7 @@ module "api_resource" {
 module "lambda_function" {
   source            = "../../base/lambda_function"
   name              = "email_manager_social_auth_callback"
-  handler           = "functions/social_auth_callback.lambda_handler"
+  handler           = "handlers/auth/social_auth_callback.lambda_handler"
   layers            = var.layers
   env_vars          = var.env_vars
   extra_policy_arns = var.extra_policy_arns

@@ -11,7 +11,7 @@ module "api_resource" {
 module "lambda_function" {
   source            = "../../base/lambda_function"
   name              = "create_label"
-  handler           = "functions/create_label.lambda_handler"
+  handler           = "handlers/label/create_label.lambda_handler"
   layers            = var.layers
   env_vars          = var.env_vars
   extra_policy_arns = var.extra_policy_arns

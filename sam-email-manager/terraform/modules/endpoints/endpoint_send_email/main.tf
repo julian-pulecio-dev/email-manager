@@ -11,7 +11,7 @@ module "api_resource" {
 module "lambda_function" {
   source            = "../../base/lambda_function"
   name              = "send_email"
-  handler           = "functions/send_email.lambda_handler"
+  handler           = "handlers/email/send_email.lambda_handler"
   layers            = var.layers
   env_vars          = var.env_vars
   extra_policy_arns = var.extra_policy_arns

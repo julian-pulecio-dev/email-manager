@@ -11,7 +11,7 @@ module "api_resource" {
 module "lambda_function" {
   source            = "../../base/lambda_function"
   name              = "google_access_tokens"
-  handler           = "functions/google_access_tokens.lambda_handler"
+  handler           = "handlers/auth/google_access_tokens.lambda_handler"
   layers            = var.layers
   env_vars          = var.env_vars
   extra_policy_arns = var.extra_policy_arns

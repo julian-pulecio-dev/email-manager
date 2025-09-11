@@ -6,7 +6,6 @@ from src.decorators.event_parser import EventParser
 from src.event_requests.get_google_oauth_tokens_requests import GetGoogleOAuthTokensRequest
 from src.models.google_oauth import GoogleOAuth
 from src.models.dynamo_db import DynamoDBTable
-from src.models.gmail_watch import GmailWatch
 from src.models.gmail_client import GmailClient
 
 

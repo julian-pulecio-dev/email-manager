@@ -1,4 +1,4 @@
-from src.models.event import Event
+from src.models.events.api_gateway_event import Event
 from src.exceptions.invalid_request_exception import InvalidRequestException
 from src.exceptions.server_exception import ServerException
 from dataclasses import dataclass

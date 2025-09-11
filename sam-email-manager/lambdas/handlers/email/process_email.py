@@ -3,7 +3,7 @@ import json
 import logging
 from base64 import b64decode
 from src.decorators.event_parser import EventParser
-from src.event_requests.recieve_email_request import ReceiveEmailRequest
+from src.event_requests.sqs_queue_request import SQSQueueRequest
 from src.models.gmail_client import GmailClient
 from src.models.gmail_watch_dog import GmailWatchDog
 from src.models.dynamo_db import DynamoDBTable
@@ -52,14 +52,14 @@ INSTRUCTION_PROMPT = """
     Email: {email}
     Categories: {categories}
     """
-@EventParser(request_class=ReceiveEmailRequest)
-def lambda_handler(event:ReceiveEmailRequest, context):
+@EventParser(request_class=SQSQueueRequest)
+def lambda_handler(event:SQSQueueRequest, context):
     logger.info(f'event: {event}')
 
     message = 'no new email found'
 
     google_access_table = DynamoDBTable(table_name=os.environ['GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME'])
-    google_access_item = google_access_table.get_item('email',event.user)
+    google_access_item = google_access_table.get_item('email', event.email)
 
     gmail_client = GmailClient(
         google_oauth_access_token=google_access_item.get('access_token', ''),
@@ -71,17 +71,17 @@ def lambda_handler(event:ReceiveEmailRequest, context):
         google_oauth_refresh_token=google_access_item.get('refresh_token', '')
     )
 
-    last_stored_history = gmail_client.retrieve_user_history_id(event.user)
+    last_stored_history = gmail_client.retrieve_user_history_id(event.email)
 
     if gmail_watch_dog.check_changes(last_stored_history.get('history_id', '')):
 
         gmail_messages = gmail_client.get_messages_from_history(last_stored_history.get('history_id', ''))
         logger.info(f'Gmail messages retrieved: {gmail_messages}')
 
-        gmail_client.store_user_history_id(event.user, gmail_client.get_last_history_id())
+        gmail_client.store_user_history_id(event.email, gmail_client.get_last_history_id())
 
         custom_labels_table = DynamoDBTable(table_name=os.environ['GMAIL_CUSTOM_LABELS_TABLE_NAME'])
-        custom_labels = custom_labels_table.scan_items('email', event.user)
+        custom_labels = custom_labels_table.scan_items('email', event.email)
 
         logger.info(f'Custom labels retrieved: {custom_labels}')
 

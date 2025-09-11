@@ -1,5 +1,6 @@
 import json
-from src.models.event import Event
+from src.models.events.api_gateway_event import ApiGatewayEvent
+from src.models.events.sqs_queue_event import SQSQueueEvent
 from src.utils.headers import get_headers
 from src.event_requests.event_request import EventRequest
 from dataclasses import dataclass
@@ -24,7 +25,10 @@ class EventParser:
 
         if len(args) == 2:
             event, context = args
-            return self._handle_request(event, context, **kwargs)
+            if 'httpMethod' in event:
+                return self._handle_api_gateway_request(event, context, **kwargs)
+            if 'Records' in event:
+                return self._handle_sqs_event(event, context, **kwargs)
 
         if len(args) == 1 and callable(args[0]):
             self.func = args[0]
@@ -32,7 +36,7 @@ class EventParser:
 
         raise TypeError("Invalid Event Parser arguments")
 
-    def _handle_request(self, event, context, **kwargs):
+    def _handle_api_gateway_request(self, event, context, **kwargs):
         logger.info(f"EventParser _handle_request event: {event}")
         """Handles the Lambda event and parses it into a request object."""
         if event['httpMethod'] == 'OPTIONS':
@@ -41,10 +45,48 @@ class EventParser:
                 'headers': get_headers(),
                 'body': ''
             }
-        lambda_event = Event.from_lambda_event(event)
+        lambda_event = ApiGatewayEvent.from_lambda_event(event)
         request = self.request_class.from_event(lambda_event)
         logger.info(f"Parsed request: {request}")
         return self.__handle_request_errors(request, context, **kwargs)
+    
+    def _handle_sqs_event(self, event, context, **kwargs):
+        logger.info(f"EventParser _handle_sqs_event event: {event}")
+        """Handles SQS events by processing each record."""
+        responses = []
+        for record in event['Records']:
+            try:
+                lambda_event = SQSQueueEvent.from_sqs_record(record)
+                request = self.request_class.from_event(lambda_event)
+                logger.info(f"Parsed SQS request: {request}")
+                response = self.__handle_request_errors(request, context, **kwargs)
+                responses.append(response)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error: {str(e)}")
+                responses.append({
+                    'statusCode': 400,
+                    'headers': get_headers(),
+                    'body': json.dumps({'error': 'Invalid JSON in SQS message'})
+                })
+            except InvalidRequestException as e:
+                logger.error(f"Invalid request: {str(e)}")
+                responses.append({
+                    'statusCode': 400,
+                    'headers': get_headers(),
+                    'body': json.dumps({'error': str(e)})
+                })
+            except ServerException as e:
+                logger.error(f"Server error: {str(e)}")
+                responses.append({
+                    'statusCode': 500,
+                    'headers': get_headers(),
+                    'body': json.dumps({'error': str(e)})
+                })
+        return {
+            'statusCode': 200,
+            'headers': get_headers(),
+            'body': json.dumps({'responses': responses})
+        }
         
     def __handle_request_errors(self, request: EventRequest, context, **kwargs):
         """Handles errors that may occur during request processing."""
