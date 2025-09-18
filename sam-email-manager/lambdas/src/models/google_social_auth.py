@@ -28,13 +28,13 @@ class GoogleSocialAuth:
         headers = {
             "Content-Type": "application/x-www-form-urlencoded"
         }
-        response = self.__send_code_request(token_url, payload, headers)
-        response = self.__validate_response(response)
-        response_parsed = self.__parse_oauth_tokens(response)
+        response = self._send_code_request(token_url, payload, headers)
+        response = self._validate_response(response)
+        response_parsed = self._parse_oauth_tokens(response)
 
         return response_parsed
 
-    def __send_code_request(self, token_url, payload, headers) -> dict:
+    def _send_code_request(self, token_url, payload, headers) -> dict:
         """Sends the authorization code to the OAuth server to exchange for tokens."""
         http = PoolManager()
         body = urlencode(payload).encode('utf-8')
@@ -52,7 +52,7 @@ class GoogleSocialAuth:
         except Exception as e:
             raise InvalidRequestException("Failed to exchange code for tokens")
     
-    def __parse_oauth_tokens(self, response) -> dict:
+    def _parse_oauth_tokens(self, response) -> dict:
         """Parses the OAuth tokens from the response data."""
         try:
             response_data = json.loads(response.data.decode('utf-8'))
@@ -70,7 +70,7 @@ class GoogleSocialAuth:
         except Exception as e:
             raise ServerException("Failed to parse OAuth tokens")
 
-    def __validate_response(self, response) -> dict:
+    def _validate_response(self, response) -> dict:
         """Validates the response from the OAuth server."""
         if response and response.status == 200:
             return response

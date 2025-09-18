@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
 from typing import List, Optional, Any, Dict, Tuple
 from google.oauth2.credentials import Credentials
-from src.models.file import File
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from src.models.file import File
+from src.models.gmail import Gmail
 import base64
 import logging
 
@@ -13,15 +14,14 @@ logger.setLevel(logging.INFO)
 
 
 @dataclass
-class GmailMessage:
+class GmailMessage(Gmail):
     id: str
     thread_id: str
-    creds: Credentials
     label_ids: List[str] = field(default_factory=list)
     _service: Optional[Any] = field(default=None)
 
     @classmethod
-    def from_dict(cls, data: dict, creds: Credentials) -> "GmailMessage":
+    def from_dict(cls, data: dict) -> "GmailMessage":
         message = data.get("message", data)  # más flexible
         if not message or "id" not in message or "threadId" not in message:
             raise ValueError(f"Invalid Gmail message data: {data}")
@@ -30,24 +30,22 @@ class GmailMessage:
             id=message["id"],
             thread_id=message["threadId"],
             label_ids=message.get("labelIds", []),
-            creds=creds
         )
 
     def __post_init__(self):
         self._init_message()
+        self._get_service()
 
     def _get_service(self):
         if not self._service:
-            self._service = build("gmail", "v1", credentials=self.creds, cache_discovery=False)
-        return self._service
+            self._service = build("gmail", "v1", credentials=self._get_access_token(), cache_discovery=False)
 
     def _init_message(
         self, fmt: str = "full"
     ) -> Optional[Dict[str, Any]]:
         """Obtiene el mensaje completo: cuerpo (plain/html) + adjuntos."""
         try:
-            service = self._get_service()
-            message = service.users().messages().get(
+            message = self._service.users().messages().get(
                 userId="me", id=self.id, format=fmt
             ).execute()
             if "payload" not in message:
@@ -116,8 +114,7 @@ class GmailMessage:
                 if data:
                     file_data = self._decode_base64url(data)
                 elif attachment_id:
-                    service = self._get_service()
-                    att = service.users().messages().attachments().get(
+                    att = self._service.users().messages().attachments().get(
                         userId="me", messageId=self.id, id=attachment_id
                     ).execute()
                     file_data = self._decode_base64url(att["data"])

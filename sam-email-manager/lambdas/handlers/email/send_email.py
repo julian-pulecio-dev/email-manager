@@ -7,7 +7,7 @@ from src.decorators.event_parser import EventParser
 from src.event_requests.send_email_request import SendEmailRequest
 from src.models.dynamo_db import DynamoDBTable
 from src.models.vertex_ia import VertexIA
-from src.models.email import Email
+from src.models.gmail_email import GmailEmail
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -69,7 +69,7 @@ def lambda_handler(event:SendEmailRequest, context):
 
     response = vertex_ia.call_vertex(INSTRUCTION_PROMPT.format(prompt=event.prompt), files=event.attachments)
 
-    email = Email(
+    email = GmailEmail(
         to=response.get('to', ''),
         subject=response.get('subject', ''),
         body=response.get('body', ''),

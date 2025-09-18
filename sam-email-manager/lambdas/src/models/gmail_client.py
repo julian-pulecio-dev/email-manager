@@ -9,15 +9,13 @@ from googleapiclient.errors import HttpError
 from typing import Optional, Dict, Any
 from src.models.dynamo_db import DynamoDBTable
 from src.models.gmail_history_event import GmailHistoryEvent
-
+from src.models.gmail import Gmail
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 @dataclass
-class GmailClient:
-    google_oauth_access_token: str
-    google_oauth_refresh_token: str
+class GmailClient(Gmail):
     dynamo_table: DynamoDBTable = field(
         default_factory=lambda: DynamoDBTable(
             table_name=os.environ['GMAIL_HISTORY_ID_TABLE_NAME']
@@ -25,13 +23,7 @@ class GmailClient:
     )
 
     def __post_init__(self):
-        self.creds = Credentials(
-            token=self.google_oauth_access_token,
-            refresh_token=self.google_oauth_refresh_token,
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=os.environ["GOOGLE_CLIENT_ID"],
-            client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
-        )
+        self.creds = self._get_access_token()
         self.service = build("gmail", "v1", credentials=self.creds, cache_discovery=False)
 
     def store_user_history_id(self, email: str, history_id: str) -> None:

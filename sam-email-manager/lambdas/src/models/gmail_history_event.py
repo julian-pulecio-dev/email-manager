@@ -2,12 +2,13 @@ import logging
 from dataclasses import dataclass
 from google.oauth2.credentials import Credentials
 from src.models.gmail_message import GmailMessage
+from src.models.gmail import Gmail
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 @dataclass
-class GmailHistoryEvent:
+class GmailHistoryEvent(Gmail):
     messages_added: list[GmailMessage]
     creds: Credentials
 

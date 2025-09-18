@@ -1,7 +1,6 @@
 import json
 import os
-from src.exceptions.invalid_request_exception import InvalidRequestException
-from src.exceptions.server_exception import ServerException
+from src.exceptions.custom_exception import CustomException
 from src.utils.headers import get_headers
 from logging import getLogger
 
@@ -19,23 +18,11 @@ class ExceptionHandler:
             dict: The standardized error response.
         """
         logger.error(f"Exception occurred: {str(error)}") 
-        if isinstance(error, InvalidRequestException):
+        if isinstance(error, CustomException):
             return {
-                'statusCode': 400,
+                'statusCode': error.status_code,
                 'headers': get_headers(),
                 'body': json.dumps({'error': str(error)})
-            }
-        elif isinstance(error, ServerException):
-            return {
-                'statusCode': 500,
-                'headers': get_headers(),
-                'body': json.dumps({'error': str(error)})
-            }
-        elif isinstance(error, json.JSONDecodeError):
-            return {
-                'statusCode': 400,
-                'headers': get_headers(),
-                'body': json.dumps({'error': 'Invalid JSON format'})
             }
         else:
             return {

@@ -1,47 +1,55 @@
 import logging
 from boto3 import client
 import botocore
-from dataclasses import dataclass, field
-from src.exceptions.server_exception import ServerException
+from boto3.dynamodb.conditions import Attr
+from dataclasses import dataclass
+from src.exceptions.dynamodb_exception import DynamoDBException
 
-
-logger = logging.getLogger()
+# Logger configurado
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+# Cliente global reutilizable
+dynamodb_client = client("dynamodb")
+
 
 @dataclass
 class DynamoDBTable:
     table_name: str
-    boto3_client: object = field(default_factory=lambda: client('dynamodb'))
+    boto3_client: object = dynamodb_client
 
     def put_item(self, item: dict):
         try:
+            logger.debug(f"Put item en {self.table_name}: {item}")
             item = DynamoDBItem.from_dict(item)
             return self.boto3_client.put_item(TableName=self.table_name, Item=item)
         except (ValueError, botocore.exceptions.ClientError) as e:
-            raise ServerException(str(e))
+            logger.error(f"Error en put_item: {e}")
+            raise DynamoDBException(str(e))
 
     def get_item(self, key_name: str, key_value, key_type: str = 'S'):
         try:
             key = {key_name: {key_type: str(key_value)}}
+            logger.debug(f"Get item en {self.table_name} con key={key}")
             response = self.boto3_client.get_item(TableName=self.table_name, Key=key)
             item = response.get("Item")
             return DynamoDBItem.to_dict(item) if item else None
         except (ValueError, botocore.exceptions.ClientError) as e:
-            raise ServerException(str(e))
-        except botocore.exceptions.ClientError as e:
-            raise ServerException(str(e))
+            logger.error(f"Error en get_item: {e}")
+            raise DynamoDBException(str(e))
 
-    def scan_items(self, key_name:str, key_value: str):
+    def scan_items(self, key_name: str, key_value: str):
         try:
+            logger.debug(f"Scan en {self.table_name} con filtro {key_name}={key_value}")
             response = self.boto3_client.scan(
                 TableName=self.table_name,
-                FilterExpression=f'{key_name} = :{key_name}_val',
-                ExpressionAttributeValues={f':{key_name}_val': {'S': key_value}}
+                FilterExpression=Attr(key_name).eq(key_value)
             )
             items = response.get("Items", [])
             return [DynamoDBItem.to_dict(item) for item in items]
         except botocore.exceptions.ClientError as e:
-            raise ServerException(str(e))
+            logger.error(f"Error en scan_items: {e}")
+            raise DynamoDBException(str(e))
 
 
 class DynamoDBItem:
@@ -87,26 +95,26 @@ class DynamoDBItem:
             return 'L'
         if isinstance(value, set):
             return cls.handle_set(value)
-        raise ValueError(f'Unhandled type: {type(value)}')
+        raise DynamoDBException(f'Unhandled type: {type(value)}')
 
     @classmethod
     def handle_set(cls, value: set):
         if not value:
-            raise ValueError('The set cannot be empty')
+            raise DynamoDBException('The set cannot be empty')
 
         types = {type(v) for v in value}
         if len(types) > 1:
-            raise ValueError('Set must contain elements of the same type')
+            raise DynamoDBException('Set must contain elements of the same type')
 
         elem_type = cls.get_item_value_type(next(iter(value)))
         if elem_type not in ['S', 'N', 'B']:
-            raise ValueError('Only sets of strings, numbers, or binaries are supported')
-        return elem_type + 'S'
+            raise DynamoDBException('Only sets of strings, numbers, or binaries are supported')
+        return f"{elem_type}S"
 
     @classmethod
     def to_dict(cls, dynamodb_item: dict):
         if not isinstance(dynamodb_item, dict):
-            raise ValueError(f'{dynamodb_item} param must be a dictionary')
+            raise DynamoDBException(f'{dynamodb_item} param must be a dictionary')
 
         plain_dict = {}
         for key, value in dynamodb_item.items():
@@ -116,16 +124,19 @@ class DynamoDBItem:
     @classmethod
     def _parse_dynamo_value(cls, value: dict):
         if not isinstance(value, dict) or len(value) != 1:
-            raise ValueError(f'Invalid DynamoDB value: {value}')
+            raise DynamoDBException(f'Invalid DynamoDB value: {value}')
 
         type_key, actual_value = next(iter(value.items()))
 
         if type_key == 'S':
             return actual_value
         if type_key == 'N':
-            return int(actual_value) if actual_value.isdigit() else float(actual_value)
+            try:
+                return int(actual_value)
+            except DynamoDBException:
+                return float(actual_value)
         if type_key == 'B':
-            return actual_value  # puede depender si es base64
+            return actual_value  # podría decodificarse base64 si hace falta
         if type_key == 'M':
             return cls.to_dict(actual_value)
         if type_key == 'L':
@@ -136,4 +147,4 @@ class DynamoDBItem:
             return {int(v) if v.isdigit() else float(v) for v in actual_value}
         if type_key == 'BS':
             return set(actual_value)
-        raise ValueError(f'Unhandled DynamoDB type: {type_key}')
+        raise DynamoDBException(f'Unhandled DynamoDB type: {type_key}')

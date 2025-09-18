@@ -1,4 +1,6 @@
-class UnauthorizedException(Exception):
+from src.exceptions.custom_exception import CustomException
+
+class UnauthorizedException(CustomException):
     """Exception raised for unauthorized access attempts."""
     
     def __init__(self, message="Unauthorized access."):

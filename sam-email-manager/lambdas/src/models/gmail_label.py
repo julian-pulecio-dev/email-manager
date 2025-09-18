@@ -7,24 +7,16 @@ from google.auth.exceptions import RefreshError
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from src.exceptions.server_exception import ServerException
+from src.models.gmail import Gmail
 
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 @dataclass
-class GmailLabel:
-    google_oauth_access_token: str
-    google_oauth_refresh_token: str
-
+class GmailLabel(Gmail):
     def __post_init__(self):
-        self.creds = Credentials(
-            token=self.google_oauth_access_token,
-            refresh_token=self.google_oauth_refresh_token,
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=os.environ["GOOGLE_CLIENT_ID"],
-            client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
-        )
+        self.creds = self._get_access_token()
         self.service = build("gmail", "v1", credentials=self.creds, cache_discovery=False)
 
     
