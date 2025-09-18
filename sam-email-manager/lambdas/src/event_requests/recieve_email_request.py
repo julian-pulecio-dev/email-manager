@@ -10,3 +10,6 @@ class ReceiveEmailRequest(EventRequest):
     """
     Request class for handling email reception.
     """
+
+    def validate(self):
+        pass

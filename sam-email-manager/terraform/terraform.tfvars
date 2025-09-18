@@ -1,0 +1,5 @@
+logger_level = "DEBUG"
+aws_region = "us-east-1"
+google_region = "us-central1"   
+environment = "dev"
+google_project_id = "email-manager-467721"

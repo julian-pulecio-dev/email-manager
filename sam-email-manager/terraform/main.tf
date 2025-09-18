@@ -10,14 +10,13 @@ terraform {
   }
 }
 
-provider "google" {
-  project = "email-manager-467721"
-  region  = "us-central1"
+provider "aws" {
+  region = var.aws_region
 }
 
-provider "aws" {
-  region = "us-east-1"
-
+provider "google" {
+  project = var.google_project_id
+  region  = var.google_region
 }
 
 data "aws_caller_identity" "current" {}
@@ -117,12 +116,13 @@ module "lambda_layer" {
 module "event_bridge" {
   source = "./modules/event_bridge_scheduler"
   schedule_expression = "rate(1 hours)"
-  schedule_name = "schedule_user_distpacher"
+  schedule_name = "schedule_user_dispatcher"
   schedule_handler = "handlers/event_bridge_scheduler/schedule_user_processor.lambda_handler"
   lambda_layers_arns = [module.lambda_layer.arn]
   env_vars = {
     EMAIL_MANAGER_AUTH_USER_POOL_ID : module.cognito_auth.pool_id
     SQS_QUEUE_URL : module.sqs_queue.url
+    LOGGER_LEVEL : var.logger_level
   }
   extra_policy_arns = [module.cognito_idp_policy.arn, module.sqs_queue_policy.arn]
 }
@@ -134,8 +134,10 @@ module "endpoint_social_callback" {
   layers             = [module.lambda_layer.arn]
   env_vars = {
     EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID : module.cognito_auth.client_id
+    EMAIL_MANAGER_AUTH_USER_POOL_ID : module.cognito_auth.pool_id
     EMAIL_MANAGER_AUTH_USER_POOL_DOMAIN : module.cognito_auth.domain
     CALLBACK_URL : "http://localhost:5173/social-login-confirm-code"
+    LOGGER_LEVEL : var.logger_level
   }
 }
 
@@ -148,8 +150,11 @@ module "endpoint_google_access_tokens" {
     GOOGLE_CLIENT_ID : module.secret_google_credentials.decoded_secret["email_manager_google_client_id"]
     GOOGLE_CLIENT_SECRET : module.secret_google_credentials.decoded_secret["email_manager_google_client_secret"]
     GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME : module.dynamodb_user_tokens.name
-    GMAIL_WATCH_PUB_SUB_NAME : "projects/email-manager-467721/topics/${module.pub_sub.topic_name}"
+    GMAIL_WATCH_PUB_SUB_NAME : "projects/${var.google_project_id}/topics/${module.pub_sub.topic_name}"
     GMAIL_HISTORY_ID_TABLE_NAME : module.dynamodb_gmail_history_id.name
+    EMAIL_MANAGER_AUTH_USER_POOL_ID : module.cognito_auth.pool_id
+    EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID : module.cognito_auth.client_id
+    LOGGER_LEVEL : var.logger_level
   }
   authorizer_id     = module.cognito_auth.cognito_authorizer_id
   extra_policy_arns = [module.dynamo_db_policy.arn]
@@ -165,6 +170,9 @@ module "endpoint_send_email" {
     GOOGLE_CLIENT_SECRET: module.secret_google_credentials.decoded_secret["email_manager_google_client_secret"]
     GOOGLE_ACCOUNT_CREDENTIALS: jsonencode(module.secret_google_account.decoded_secret)
     GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: module.dynamodb_user_tokens.name
+    EMAIL_MANAGER_AUTH_USER_POOL_ID : module.cognito_auth.pool_id
+    EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID : module.cognito_auth.client_id
+    LOGGER_LEVEL : var.logger_level
   }
   authorizer_id     = module.cognito_auth.cognito_authorizer_id
   extra_policy_arns = [module.dynamo_db_policy.arn]
@@ -180,33 +188,46 @@ module "endpoint_label" {
     GOOGLE_CLIENT_SECRET: module.secret_google_credentials.decoded_secret["email_manager_google_client_secret"]
     GOOGLE_ACCOUNT_CREDENTIALS: jsonencode(module.secret_google_account.decoded_secret)
     GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: module.dynamodb_user_tokens.name
+    EMAIL_MANAGER_AUTH_USER_POOL_ID : module.cognito_auth.pool_id
+    EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID : module.cognito_auth.client_id
     GMAIL_HISTORY_ID_TABLE_NAME: module.dynamodb_gmail_history_id.name
     GMAIL_CUSTOM_LABELS_TABLE_NAME: module.dynamodb_labels_table.name
+    LOGGER_LEVEL : var.logger_level
   }
   authorizer_id     = module.cognito_auth.cognito_authorizer_id
   extra_policy_arns = [module.dynamo_db_policy.arn]
 }
 
-module "endpoint_process_email" {
-  source             = "./modules/endpoints/endpoint_process_email"
-  api_id             = module.api.id    
-  parent_resource_id = module.api.root_resource_id
-  layers             = [module.lambda_layer.arn]
+module "lambda_process_email" {
+  source = "./modules/base/lambda_function"
+  name   = "process_email"
+  handler = "handlers/email/process_email.lambda_handler"
   env_vars = {
     GOOGLE_CLIENT_ID: module.secret_google_credentials.decoded_secret["email_manager_google_client_id"]
     GOOGLE_CLIENT_SECRET: module.secret_google_credentials.decoded_secret["email_manager_google_client_secret"]
     GOOGLE_ACCOUNT_CREDENTIALS: jsonencode(module.secret_google_account.decoded_secret)
     GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: module.dynamodb_user_tokens.name
+    EMAIL_MANAGER_AUTH_USER_POOL_ID : module.cognito_auth.pool_id
+    EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID : module.cognito_auth.client_id
     GMAIL_HISTORY_ID_TABLE_NAME: module.dynamodb_gmail_history_id.name
     GMAIL_CUSTOM_LABELS_TABLE_NAME: module.dynamodb_labels_table.name
+    LOGGER_LEVEL: var.logger_level
   }
-  authorizer_id     = module.cognito_auth.cognito_authorizer_id
+  layers = [module.lambda_layer.arn]
   extra_policy_arns = [module.dynamo_db_policy.arn, module.sqs_queue_policy.arn]
+}
+
+module "sqs_dead_letter_queue" {
+  source = "./modules/base/sqs_queue"
+  queue_name =  "email-manager-dead-letter-queue"
+  visibility_timeout_seconds = 300
 }
 
 module "sqs_queue" {
   source = "./modules/base/sqs_queue"
   queue_name =  "email-manager-queue"
-  trigger_lambda_arn = module.endpoint_process_email.lambda_arn
+  create_trigger = true
+  trigger_lambda_arn = module.lambda_process_email.arn
   visibility_timeout_seconds = 600
+  dead_letter_queue_arn = module.sqs_dead_letter_queue.arn
 }

@@ -12,6 +12,8 @@ resource "aws_sqs_queue" "terraform_queue" {
 }
 
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
+  count = var.create_trigger ? 1 : 0
+
   event_source_arn = aws_sqs_queue.terraform_queue.arn
   function_name    = var.trigger_lambda_arn
   batch_size       = 10

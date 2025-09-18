@@ -22,8 +22,6 @@ class GmailMessage:
 
     @classmethod
     def from_dict(cls, data: dict, creds: Credentials) -> "GmailMessage":
-        logger.info(f"Parsing GmailMessage from data: {data}")
-
         message = data.get("message", data)  # más flexible
         if not message or "id" not in message or "threadId" not in message:
             raise ValueError(f"Invalid Gmail message data: {data}")

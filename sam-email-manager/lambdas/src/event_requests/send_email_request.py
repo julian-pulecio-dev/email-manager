@@ -21,3 +21,6 @@ class SendEmailRequest(EventRequest):
             self.attachments = [
                 File(**file) for file in files
             ]
+
+    def validate(self):
+        pass

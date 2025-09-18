@@ -10,3 +10,6 @@ class SQSQueueRequest(EventRequest):
     updated_at: str
     enabled: bool
     status: str
+
+    def validate(self):
+        pass

@@ -13,7 +13,6 @@ class GmailHistoryEvent:
 
     @classmethod
     def from_dict(cls, data: dict, creds: Credentials) -> "GmailHistoryEvent":
-        logger.info(f"Parsing GmailHistoryEvent from data: {data}")
         return cls(
             messages_added=[
                 GmailMessage.from_dict(msg, creds) for msg in data.get("messagesAdded", [])

@@ -54,13 +54,10 @@ class GmailClient:
             startHistoryId=history_id
         ).execute()
 
-        logger.info(f'Gmail history_events: {history_events}')
-
         gmail_messages = []
         for history_event in history_events.get('history', []):
             gmail_history_event = GmailHistoryEvent.from_dict(history_event, self.creds)
             gmail_messages.extend(gmail_history_event.messages_added)
         
 
-        logger.info(f'Gmail gmail_messages: {gmail_messages}')
         return gmail_messages

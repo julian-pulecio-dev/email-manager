@@ -63,7 +63,12 @@ variable "max_receive_count" {
 variable "trigger_lambda_arn" {
   description = "ARN de la función Lambda que será activada por la cola SQS"
   type        = string
-  
+  default     = null
+}
+
+variable "create_trigger" {
+  type    = bool
+  default = false
 }
 
 variable "visibility_timeout_seconds" {

@@ -1,108 +1,32 @@
-import json
-from src.models.events.api_gateway_event import ApiGatewayEvent
-from src.models.events.sqs_queue_event import SQSQueueEvent
-from src.utils.headers import get_headers
-from src.event_requests.event_request import EventRequest
-from dataclasses import dataclass
-from dataclasses import dataclass
-from typing import Optional, Callable
-from dataclasses import field
-from src.exceptions.invalid_request_exception import InvalidRequestException
-from src.exceptions.server_exception import ServerException
+import os
+from dataclasses import dataclass, field
 from logging import getLogger
+from typing import Callable, Any, Optional
+from src.exceptions.exception_handler import ExceptionHandler
+from src.exceptions.server_exception import ServerException
+from src.event_requests.event_request import EventRequest
+from src.event_normalizers.api_gateway_event_normalizer import ApiGatewayEventNormalizer
+from src.event_normalizers.sqs_event_normalizer import SqsEventNormalizer
 
 logger = getLogger(__name__)
-logger.setLevel('DEBUG')
+logger.setLevel(os.getenv("LOGGER_LEVEL", "NOTSET"))
 
 @dataclass
 class EventParser:
-    func: Optional[Callable] = None
-    request_class: Optional[EventRequest] = field(default=None, kw_only=True)
+    func: Optional[Callable] = field(init=False, default=None)
+    request_class: Optional[type[EventRequest]] = field(default=None, kw_only=True)
 
-    def __call__(self, *args, **kwargs):
-        if self.func is not None and len(args) == 1 and callable(args[0]):
-            return self
+    def __call__(self, func: Callable) -> Callable:
+        self.func = func
 
-        if len(args) == 2:
-            event, context = args
-            if 'httpMethod' in event:
-                return self._handle_api_gateway_request(event, context, **kwargs)
-            if 'Records' in event:
-                return self._handle_sqs_event(event, context, **kwargs)
-
-        if len(args) == 1 and callable(args[0]):
-            self.func = args[0]
-            return self
-
-        raise TypeError("Invalid Event Parser arguments")
-
-    def _handle_api_gateway_request(self, event, context, **kwargs):
-        logger.info(f"EventParser _handle_request event: {event}")
-        """Handles the Lambda event and parses it into a request object."""
-        if event['httpMethod'] == 'OPTIONS':
-            return {
-                'statusCode': 204,
-                'headers': get_headers(),
-                'body': ''
-            }
-        lambda_event = ApiGatewayEvent.from_lambda_event(event)
-        request = self.request_class.from_event(lambda_event)
-        logger.info(f"Parsed request: {request}")
-        return self.__handle_request_errors(request, context, **kwargs)
-    
-    def _handle_sqs_event(self, event, context, **kwargs):
-        logger.info(f"EventParser _handle_sqs_event event: {event}")
-        """Handles SQS events by processing each record."""
-        responses = []
-        for record in event['Records']:
+        def wrapper(event: dict, context: dict, **kwargs: Any) -> Any:
             try:
-                lambda_event = SQSQueueEvent.from_sqs_record(record)
-                request = self.request_class.from_event(lambda_event)
-                logger.info(f"Parsed SQS request: {request}")
-                response = self.__handle_request_errors(request, context, **kwargs)
-                responses.append(response)
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON decode error: {str(e)}")
-                responses.append({
-                    'statusCode': 400,
-                    'headers': get_headers(),
-                    'body': json.dumps({'error': 'Invalid JSON in SQS message'})
-                })
-            except InvalidRequestException as e:
-                logger.error(f"Invalid request: {str(e)}")
-                responses.append({
-                    'statusCode': 400,
-                    'headers': get_headers(),
-                    'body': json.dumps({'error': str(e)})
-                })
-            except ServerException as e:
-                logger.error(f"Server error: {str(e)}")
-                responses.append({
-                    'statusCode': 500,
-                    'headers': get_headers(),
-                    'body': json.dumps({'error': str(e)})
-                })
-        return {
-            'statusCode': 200,
-            'headers': get_headers(),
-            'body': json.dumps({'responses': responses})
-        }
-        
-    def __handle_request_errors(self, request: EventRequest, context, **kwargs):
-        """Handles errors that may occur during request processing."""
-        try:
-            return self.func(request, context, **kwargs)
-        except InvalidRequestException as e:
-            logger.error(f"Invalid request: {str(e)}")
-            return {
-                'statusCode': 400,
-                'headers': get_headers(),
-                'body': json.dumps({'error': str(e)})
-            }
-        except ServerException as e:
-            logger.error(f"Server error: {str(e)}")
-            return {
-                'statusCode': 500,
-                'headers': get_headers(),
-                'body': json.dumps({'error': str(e)})
-            }
+                if "httpMethod" in event:
+                    return ApiGatewayEventNormalizer(func, self.request_class).handle(event, context, **kwargs)
+                if "Records" in event:
+                    return SqsEventNormalizer(func, self.request_class).handle(event, context, **kwargs)
+                raise ServerException("Unsupported event type")
+            except Exception as e:
+                return ExceptionHandler.handle_exception(e)
+
+        return wrapper

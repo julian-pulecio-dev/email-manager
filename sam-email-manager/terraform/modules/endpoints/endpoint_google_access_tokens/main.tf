@@ -20,7 +20,7 @@ module "lambda_function" {
 module "api_method_auth" {
   source             = "../../base/api_method_auth"
   api_id             = var.api_id
-  unique_key         = "email_manager_google_access_tokens"
+  unique_key         = "google_access_tokens"
   resource_id        = module.api_resource.id
   resource_path      = module.api_resource.path
   path_part          = ""

@@ -15,7 +15,6 @@ def lambda_handler(event, context):
 
     cognito_user_pool = CognitoUserPool(id=os.getenv("EMAIL_MANAGER_AUTH_USER_POOL_ID"))
     users = [user.to_dict() for user in cognito_user_pool.get_users()]
-    logger.info(f"Fetched {len(users)} users from Cognito User Pool {cognito_user_pool.id}")
     sqs_queue = SQSQueue(id="email-manager-queue")
     for user in users:
         sqs_queue.send_message(message=json.dumps(user), queue_url=SQS_QUEUE_URL)

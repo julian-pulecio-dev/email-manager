@@ -5,3 +5,6 @@ from dataclasses import dataclass
 class SocialAuthCallbackRequest(EventRequest):
     code: str
     provider: str
+
+    def validate(self):
+        pass

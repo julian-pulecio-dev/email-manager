@@ -1,6 +1,4 @@
 from dataclasses import dataclass, InitVar
-from base64 import b64decode
-import json
 from src.event_requests.event_request import EventRequest
 
 
@@ -11,3 +9,6 @@ class CreateLabelRequest(EventRequest):
     """
     instruction: str
     title: str
+
+    def validate(self):
+        pass

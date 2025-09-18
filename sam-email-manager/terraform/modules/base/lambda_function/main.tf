@@ -6,7 +6,7 @@ data "archive_file" "lambda_zip" {
 
 # Rol de ejecución de Lambda
 resource "aws_iam_role" "lambda_execution_role" {
-  name = "${var.name}_lambda_exec_role"
+  name_prefix = "${var.name}_exec_role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -22,7 +22,7 @@ resource "aws_iam_role" "lambda_execution_role" {
 }
 
 resource "aws_iam_policy" "cloudwatch_policy" {
-  name        = "${var.name}_cloudwatch_policy"
+  name_prefix = "${var.name}_cloudwatch_policy"
   description = "Allow Lambda to write logs to CloudWatch"
   policy = jsonencode({
     Version = "2012-10-17"

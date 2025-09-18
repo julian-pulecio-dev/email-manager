@@ -37,7 +37,6 @@ class GmailLabel:
             }
 
             label = self.service.users().labels().create(userId="me", body=label_object).execute()
-            logger.info(f"Etiqueta creada: {label['id']} - {label['name']}")
             return label
 
         except HttpError as http_err:
@@ -63,9 +62,7 @@ class GmailLabel:
                 body=body
             ).execute()
 
-            logger.info(f"Mensaje {message_id} movido a las etiquetas {label_ids}")
             return updated_msg
 
         except HttpError as http_err:
-            logger.info(f"Error HTTP al mover mensaje: {http_err}")
             raise ServerException("Error HTTP al mover mensaje", http_err)

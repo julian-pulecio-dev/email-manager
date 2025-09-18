@@ -54,8 +54,6 @@ INSTRUCTION_PROMPT = """
     """
 @EventParser(request_class=SQSQueueRequest)
 def lambda_handler(event:SQSQueueRequest, context):
-    logger.info(f'event: {event}')
-
     message = 'no new email found'
 
     google_access_table = DynamoDBTable(table_name=os.environ['GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME'])
@@ -76,18 +74,12 @@ def lambda_handler(event:SQSQueueRequest, context):
     if gmail_watch_dog.check_changes(last_stored_history.get('history_id', '')):
 
         gmail_messages = gmail_client.get_messages_from_history(last_stored_history.get('history_id', ''))
-        logger.info(f'Gmail messages retrieved: {gmail_messages}')
-
         gmail_client.store_user_history_id(event.email, gmail_client.get_last_history_id())
 
         custom_labels_table = DynamoDBTable(table_name=os.environ['GMAIL_CUSTOM_LABELS_TABLE_NAME'])
         custom_labels = custom_labels_table.scan_items('email', event.email)
 
-        logger.info(f'Custom labels retrieved: {custom_labels}')
-
         categories = {lbl['title']: lbl['instruction'] for lbl in custom_labels}
-
-        logger.info(f'Custom labels retrieved: {categories}')
 
         vertex_ia = VertexIA(
             scopes=['https://www.googleapis.com/auth/cloud-platform'],
@@ -103,11 +95,7 @@ def lambda_handler(event:SQSQueueRequest, context):
 
         for message in gmail_messages:
             instruction =  INSTRUCTION_PROMPT.format(email=json.dumps(message.to_dict()), categories=json.dumps(categories))
-            logger.info(f'INSTRUCTION_PROMPT: {instruction}')
-
             response = vertex_ia.call_vertex(instruction, message.attachments)
-            logger.info(f'Vertex IA response: {response}')
-
             labels_ids = [label['label_id'] for label in custom_labels if label['title'] in response.get('labels', [])]
             gmail_label.move_message_to_label(message.id, labels_ids)
 

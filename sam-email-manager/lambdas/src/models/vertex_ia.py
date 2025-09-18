@@ -42,14 +42,10 @@ class VertexIA:
         headers = self.__get_headers(token)
         body = self.__get_body(prompt, files)
 
-        logger.info(f"Calling Vertex AI with body: {body}")
-
         try:
             response = requests.post(endpoint, headers=headers, json=body)
-            logger.info(f"Response from Vertex AI: {response.status_code} - {response.text}")
             return self.__handle_response(response)
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error al llamar a Vertex: {e}")
             raise ServerException(f"Error al llamar a Vertex: {e}")
     
     def __get_vertex_endpoint(self):

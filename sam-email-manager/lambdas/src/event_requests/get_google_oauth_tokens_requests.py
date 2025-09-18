@@ -7,3 +7,6 @@ class GetGoogleOAuthTokensRequest(EventRequest):
     Request class for handling social authentication token retrieval.
     """
     code: str
+
+    def validate(self):
+        pass

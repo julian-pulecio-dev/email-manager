@@ -1,29 +1,26 @@
 import base64
 import json
 import logging
+import os
+from io import BytesIO
 from urllib.parse import parse_qs
 from dataclasses import dataclass
-from io import BytesIO
-from src.utils.search import get_case_insensitive_value
-
 from werkzeug.wrappers import Request
 from werkzeug.test import EnvironBuilder
 from werkzeug.formparser import parse_form_data
-
 from src.models.events.event import Event
+from src.utils.search import get_case_insensitive_value
 from src.exceptions.invalid_request_exception import InvalidRequestException
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(os.getenv("LOGGER_LEVEL", "NOTSET"))
 
 @dataclass
 class ApiGatewayEvent(Event):
     """Represents an AWS Lambda event with parsed parameters."""
-    last_content_type = ""  # Clase variable temporal para Content-Type
-
     @classmethod
     def from_lambda_event(cls, lambda_event: dict):
-        parameters = cls.__get_parameters(lambda_event)
+        parameters = cls._get_parameters(lambda_event)
         if not isinstance(parameters, dict):
             parameters = json.loads(parameters)
         return cls(
@@ -33,15 +30,15 @@ class ApiGatewayEvent(Event):
         )
 
     @classmethod
-    def __get_parameters(cls, lambda_event: dict):
+    def _get_parameters(cls, lambda_event: dict):
         http_method = lambda_event.get('httpMethod')
         if http_method == 'GET':
-            return cls.__get_querystring_parameters(lambda_event)
+            return cls._get_querystring_parameters(lambda_event)
         if http_method in ['POST', 'PUT', 'PATCH']:
-            return cls.__get_body_parameters(lambda_event)
+            return cls._get_body_parameters(lambda_event)
 
     @classmethod
-    def __get_querystring_parameters(cls, lambda_event: dict) -> dict:
+    def _get_querystring_parameters(cls, lambda_event: dict) -> dict:
         query_params = lambda_event.get('queryStringParameters', {})
         multi_value_params = lambda_event.get('multiValueQueryStringParameters', {})
 
@@ -52,35 +49,39 @@ class ApiGatewayEvent(Event):
         return parsed_params
 
     @classmethod
-    def __get_body_parameters(cls, lambda_event: dict) -> dict:
+    def _get_body_parameters(cls, lambda_event: dict) -> dict:
         content_type = get_case_insensitive_value(lambda_event.get('headers', {}), 'content-type')
-        cls.last_content_type = content_type
-
-        body = lambda_event.get('body', '')
-        if body is None:
-            body_len = 0
-        else:
-            body_len = len(body)
-
+        body = lambda_event.get('body', '') or b""
+        
         if lambda_event.get('isBase64Encoded', False):
             body = base64.b64decode(body)
+        
+        elif isinstance(body, str):
+            body = body.encode("utf-8")
+        
+        elif not isinstance(body, bytes):
+            body = bytes(body)
 
+        body_len = len(body)
+        
         if 'application/json' in content_type:
             if body:
-                return json.loads(body)
+                return json.loads(body.decode("utf-8"))
             return {}
+        
         elif 'multipart/form-data' in content_type:
-            return cls.__get_multipart_form_data(body, body_len)
+            return cls._get_multipart_form_data(body, body_len, content_type)
+        
         elif 'application/x-www-form-urlencoded' in content_type:
+            if isinstance(body, bytes):
+                body = body.decode("utf-8")
             return {k: v[0] if len(v) == 1 else v for k, v in parse_qs(body).items()}
+        
         else:
             return body
 
     @classmethod
-    def __get_multipart_form_data(cls, body: bytes, body_len: int) -> dict:
-        logger.info(body)
-        logger.info('type of body: ' + str(type(body)))
-        content_type = cls.last_content_type
+    def _get_multipart_form_data(cls, body: bytes, body_len: int, content_type: str) -> dict:
         if not content_type.startswith("multipart/form-data"):
             raise InvalidRequestException("Invalid content-type for multipart parsing")
 
@@ -92,10 +93,7 @@ class ApiGatewayEvent(Event):
             content_length=body_len
         )
         env = builder.get_environ()
-        request = Request(env)
-
         _, form, files = parse_form_data(env)
-        logger.info(f"Parsed form data: {form}")
 
         result = {}
 
