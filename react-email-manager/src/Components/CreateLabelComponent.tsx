@@ -1,42 +1,72 @@
-import { useState } from 'react';
-import { createLabel } from '../Services/CreatePrompt';
+import { useState, useEffect } from "react";
+import { createLabel } from "../Services/CreatePrompt";
+import { getLabels } from "../Services/GetLabels";
+
+type Label = {
+  id: string;
+  name: string;
+};
 
 const CreateLabelComponent = () => {
-  const [instruction, setInstruction] = useState('');
-  const [title, setTitle] = useState('');
+  const [instruction, setInstruction] = useState("");
+  const [title, setTitle] = useState("");
+  const [labels, setLabels] = useState<Label[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleTextChange = (e:any) => {
-    setInstruction(e.target.value);
+  // Cargar labels existentes
+  useEffect(() => {
+    const fetchLabels = async () => {
+      try {
+        const response = await getLabels();
+        setLabels(response.data);
+      } catch (err) {
+        console.error("Error cargando labels:", err);
+        setError("No se pudieron cargar los labels existentes");
+      }
+    };
+    fetchLabels();
+  }, []);
+
+  // Manejar selección múltiple
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const values = Array.from(e.target.selectedOptions, (opt) => opt.value);
+    setSelected(values);
   };
 
-  const handleTitleChange = (e:any) => {
-    setTitle(e.target.value);
-  };
+const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
 
-  const handleSubmit = async (e:any) => {
-    e.preventDefault();
+  if (!instruction || !title) {
+    setError("Debes completar todos los campos.");
+    return;
+  }
 
-    if (!instruction) {
-      alert("Por favor escribe un prompt.");
-      return;
-    }
+  setLoading(true);
+  setError(null);
 
-    if (!title) {
-      alert("Por favor escribe un título.");
-      return;
-    }
+  try {
+    const payload = {
+      instruction,
+      title,
+      filtered_labels: selected,
+    };
 
-    const formData = new FormData();
-    formData.append("instruction", instruction);
-    formData.append("title", title);
+    const response = await createLabel(payload); 
+    console.log("Respuesta del servidor:", response);
 
-    try {
-      const response = await createLabel(formData);
-      console.log('Respuesta del servidor:', response);
-    } catch (error) {
-      console.error('Error al enviar el formulario:', error);
-    }
-  };
+    setInstruction("");
+    setTitle("");
+    setSelected([]);
+  } catch (err) {
+    console.error("Error al enviar el formulario:", err);
+    setError("Hubo un error al enviar el formulario.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="formulario-container">
@@ -45,22 +75,38 @@ const CreateLabelComponent = () => {
         <div className="textarea-container">
           <textarea
             value={instruction}
-            onChange={handleTextChange}
+            onChange={(e) => setInstruction(e.target.value)}
             placeholder="Escribe tu mensaje aquí..."
             rows={5}
             cols={50}
           />
         </div>
+
         <div className="input-container">
           <input
             type="text"
             value={title}
-            onChange={handleTitleChange}
+            onChange={(e) => setTitle(e.target.value)}
             placeholder="Escribe el título aquí..."
           />
         </div>
-        <button type="submit" className="submit-button">
-          Enviar
+
+        {/* Multi-select de labels existentes */}
+        <div className="select-container">
+          <label>Relacionar con labels existentes:</label>
+          <select multiple value={selected} onChange={handleSelectChange}>
+            {labels.map((label) => (
+              <option key={label.id} value={label.id}>
+                {label.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {error && <p className="error-message">{error}</p>}
+
+        <button type="submit" className="submit-button" disabled={loading}>
+          {loading ? "Enviando..." : "Enviar"}
         </button>
       </form>
     </div>

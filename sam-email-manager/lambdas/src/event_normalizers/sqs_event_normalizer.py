@@ -22,6 +22,8 @@ class SqsEventNormalizer(BaseEventHandler):
                 _ = self.func(request, context, **kwargs)
             except Exception as e:
                 logger.error(f"Error processing record {record['messageId']}: {str(e)}")
+                if logger.level == 10:  # DEBUG level
+                    raise e  # Re-raise the error in debug mode for visibility
                 failure_responses.append({"itemIdentifier": record["messageId"]})
 
         if failure_responses:

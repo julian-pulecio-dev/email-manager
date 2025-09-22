@@ -21,8 +21,18 @@ def lambda_handler(event:CreateLabelRequest, context):
     )
     label_id = gmail_label.create_label(event.title).get('id')
 
+    logger.info(f'filtered_labels: {event.filtered_labels}, type: {type(event.filtered_labels)}')
+
     custom_labels_table = DynamoDBTable(table_name=os.environ["GMAIL_CUSTOM_LABELS_TABLE_NAME"])
-    custom_labels_table.put_item(item={"title": event.title, "instruction": event.instruction, "email": event.user, "label_id": label_id})
+    custom_labels_table.put_item(
+        item={
+            "title": event.title,
+            "instruction": event.instruction,
+            "email": event.user,
+            "label_id": label_id,
+            "filtered_labels":  ','.join(event.filtered_labels)
+        }
+    )
 
     return {
         "statusCode": 200,

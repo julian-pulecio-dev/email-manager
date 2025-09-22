@@ -4,7 +4,6 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from src.models.file import File
-from src.models.gmail import Gmail
 import base64
 import logging
 
@@ -14,14 +13,23 @@ logger.setLevel(logging.INFO)
 
 
 @dataclass
-class GmailMessage(Gmail):
+class GmailMessage:
     id: str
     thread_id: str
+    creds : Credentials
     label_ids: List[str] = field(default_factory=list)
     _service: Optional[Any] = field(default=None)
+    body_plain: Optional[str] = field(default=None)
+    body_html: Optional[str] = field(default=None)
+    subject: Optional[str] = field(default=None)
+    sender: Optional[str] = field(default=None)
+    to: Optional[str] = field(default=None)
+    date: Optional[str] = field(default=None)
+    attachments: List[File] = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "GmailMessage":
+    def from_dict(cls, data: dict, creds: Credentials) -> "GmailMessage":
+        logger.info(f'Parsing GmailMessage from data: {data}')
         message = data.get("message", data)  # más flexible
         if not message or "id" not in message or "threadId" not in message:
             raise ValueError(f"Invalid Gmail message data: {data}")
@@ -30,15 +38,18 @@ class GmailMessage(Gmail):
             id=message["id"],
             thread_id=message["threadId"],
             label_ids=message.get("labelIds", []),
+            creds=creds
         )
 
     def __post_init__(self):
-        self._init_message()
+        logger.info(f'Initializing GmailMessage with ID: {self.id}')
         self._get_service()
+        self._init_message()
+
 
     def _get_service(self):
         if not self._service:
-            self._service = build("gmail", "v1", credentials=self._get_access_token(), cache_discovery=False)
+            self._service = build("gmail", "v1", credentials=self.creds, cache_discovery=False)
 
     def _init_message(
         self, fmt: str = "full"
@@ -56,11 +67,14 @@ class GmailMessage(Gmail):
                 message.get("payload", {})
             )
             self.headers = self._get_all_headers(message.get("payload", {}))
+            logger.debug(f'Processed GmailMessage data: {self.to_dict()}')
 
         except HttpError as e:
+            if e.resp.status == 404:
+                logger.error(f"Gmail message not found: {self.id}")
+                return None
             logger.error(f"Gmail API error: {e}")
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
+            raise e
         return None
 
     def _decode_base64url(self, data: str) -> bytes:
@@ -73,18 +87,18 @@ class GmailMessage(Gmail):
         return base64.urlsafe_b64decode(data)
 
     def _get_all_headers(self, payload: dict) -> dict:
-        if "headers" not in payload:
-            return {}
-        headers = {header.get("name").lower(): header.get("value") for header in payload.get("headers", [])}
-
+        headers = {h.get("name").lower(): h.get("value") for h in payload.get("headers", [])}
         self.subject = headers.get("subject", "")
         self.sender = headers.get("from", "")
         self.to = headers.get("to", "")
         self.date = headers.get("date", "")
+        return headers
+
 
     def _extract_bodies_and_attachments(
         self, payload: dict
-    ) -> Tuple[Optional[str], Optional[str], List[Dict[str, Any]]]:
+    ) -> Tuple[Optional[str], Optional[str], List[File]]:
+
         """
         Extrae cuerpo plain/html y adjuntos de manera recursiva.
         """

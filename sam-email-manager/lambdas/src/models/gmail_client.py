@@ -51,5 +51,4 @@ class GmailClient(Gmail):
             gmail_history_event = GmailHistoryEvent.from_dict(history_event, self.creds)
             gmail_messages.extend(gmail_history_event.messages_added)
         
-
         return gmail_messages

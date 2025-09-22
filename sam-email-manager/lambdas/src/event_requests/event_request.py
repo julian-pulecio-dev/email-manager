@@ -21,8 +21,6 @@ class EventRequest:
             return instance
         except TypeError as e:
             raise InvalidRequestException(f"Invalid event data for {cls.__name__}: {e}")
-        except Exception as e:
-            raise ServerException(f"Failed to create request from event: {str(e)}")
     
     def _set_headers(self, headers:dict):
         self.headers = headers

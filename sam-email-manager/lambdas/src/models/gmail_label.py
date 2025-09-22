@@ -37,15 +37,23 @@ class GmailLabel(Gmail):
         except RefreshError as refresh_err:
             raise ServerException(f"Error de autenticación al crear etiqueta: {str(refresh_err)}")
 
-        except Exception as e:
-            raise ServerException(f"Error inesperado al crear etiqueta: {str(e)}")
+    def get_labels(self) -> List[dict]:
+        try:
+            results = self.service.users().labels().list(userId="me").execute()
+            labels = results.get("labels", [])
+            return labels
 
+        except HttpError as http_err:
+            raise ServerException(f"Error HTTP al obtener etiquetas: {str(http_err)}")
 
-    def move_message_to_label(self, message_id: str, label_ids: List[str]):
+        except RefreshError as refresh_err:
+            raise ServerException(f"Error de autenticación al obtener etiquetas: {str(refresh_err)}")
+
+    def move_message_to_label(self, message_id: str, label_ids: List[str], filtered_labels: List[str] = []):
         try:
             body = {
                 "addLabelIds": label_ids,
-                "removeLabelIds": ["INBOX"]
+                "removeLabelIds": filtered_labels
             }
 
             updated_msg = self.service.users().messages().modify(
@@ -57,4 +65,7 @@ class GmailLabel(Gmail):
             return updated_msg
 
         except HttpError as http_err:
-            raise ServerException("Error HTTP al mover mensaje", http_err)
+            if http_err.resp.status == 404:
+                logger.error(f"Gmail message not found: {message_id}")
+                return None
+            raise ServerException(f"Error HTTP al mover mensaje a etiqueta: {str(http_err)}")

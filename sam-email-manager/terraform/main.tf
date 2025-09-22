@@ -115,7 +115,7 @@ module "lambda_layer" {
 
 module "event_bridge" {
   source = "./modules/event_bridge_scheduler"
-  schedule_expression = "rate(1 hours)"
+  schedule_expression = "rate(5 minutes)"
   schedule_name = "schedule_user_dispatcher"
   schedule_handler = "handlers/event_bridge_scheduler/schedule_user_processor.lambda_handler"
   lambda_layers_arns = [module.lambda_layer.arn]
@@ -180,6 +180,26 @@ module "endpoint_send_email" {
 
 module "endpoint_label" {
   source             = "./modules/endpoints/endpoint_label"
+  api_id             = module.api.id
+  parent_resource_id = module.api.root_resource_id
+  layers             = [module.lambda_layer.arn]
+  env_vars = {
+    GOOGLE_CLIENT_ID: module.secret_google_credentials.decoded_secret["email_manager_google_client_id"]
+    GOOGLE_CLIENT_SECRET: module.secret_google_credentials.decoded_secret["email_manager_google_client_secret"]
+    GOOGLE_ACCOUNT_CREDENTIALS: jsonencode(module.secret_google_account.decoded_secret)
+    GOOGLE_OAUTH_ACCESS_TOKENS_TABLE_NAME: module.dynamodb_user_tokens.name
+    EMAIL_MANAGER_AUTH_USER_POOL_ID : module.cognito_auth.pool_id
+    EMAIL_MANAGER_AUTH_USER_POOL_CLIENT_ID : module.cognito_auth.client_id
+    GMAIL_HISTORY_ID_TABLE_NAME: module.dynamodb_gmail_history_id.name
+    GMAIL_CUSTOM_LABELS_TABLE_NAME: module.dynamodb_labels_table.name
+    LOGGER_LEVEL : var.logger_level
+  }
+  authorizer_id     = module.cognito_auth.cognito_authorizer_id
+  extra_policy_arns = [module.dynamo_db_policy.arn]
+}
+
+module "endpoint_list_categories" {
+  source             = "./modules/endpoints/endpoint_list_categories"
   api_id             = module.api.id
   parent_resource_id = module.api.root_resource_id
   layers             = [module.lambda_layer.arn]

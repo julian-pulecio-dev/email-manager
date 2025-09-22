@@ -2,6 +2,7 @@ import CognitoLoginComponent from '../Components/CognitoLoginComponent';
 import GoogleOAuthComponent from "../Components/GoogleOAuthComponent";
 import PromptBoxComponent from '../Components/PromptBoxComponent';
 import CreateLabelComponent from '../Components/CreateLabelComponent';
+import MultiSelectLabels from '../Components/ListLabelsComponent'; 
 
 const HomePage = () => {
   return (
@@ -11,6 +12,7 @@ const HomePage = () => {
       <GoogleOAuthComponent />
       <PromptBoxComponent />
       <CreateLabelComponent />
+      <MultiSelectLabels />
     </div>
   );
 };

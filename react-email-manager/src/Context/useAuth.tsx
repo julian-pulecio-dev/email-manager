@@ -1,6 +1,6 @@
 import { createContext, useEffect, useState } from "react";
 import { callbackSocialLogin } from "../Services/CallbackSocialLogin";
-import { getGoogleOauthTokens } from "../Services/GetGoogleOauthTokens"
+import { getGoogleOauthTokens } from "../Services/GetGoogleOauthTokens";
 import type { UserProfile } from "../Types/User";
 import { decodeToken } from "../Helpers/DecodeJWT";
 import React from "react";
@@ -29,53 +29,79 @@ export const UserProvider = ({ children }: Props) => {
 
   useEffect(() => {
     console.log("UserProvider useEffect called");
-    const user = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
-    if (user && token) {
+    const storedUser = localStorage.getItem("user");
+    const storedToken = localStorage.getItem("token");
+    if (storedUser && storedToken) {
       console.log("User and token found in localStorage");
-      setUser(JSON.parse(user));
-      setToken(token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      setUser(JSON.parse(storedUser));
+      setToken(storedToken);
+      axios.defaults.headers.common["Authorization"] = `Bearer ${storedToken}`;
     }
     setIsReady(true);
   }, []);
 
-
   const callbackSocialLoginUser = async (code: string, provider: string) => {
-    const res = await callbackSocialLogin(code, provider);
-    if (res?.status == 200) {
-      const decodedToken = decodeToken(res?.data.idToken!);
-      if (!decodedToken?.email) {
-        throw new Error("Decoded token does not contain a valid email.");
+    try {
+      const res = await callbackSocialLogin(code, provider);
+      if (res?.status === 200) {
+        const decodedToken = decodeToken(res?.data.idToken!);
+        if (!decodedToken?.email) {
+          setError("El token no contiene un email válido");
+          return false;
+        }
+
+        const userObj = {
+          userName: decodedToken.email,
+          email: decodedToken.email,
+        };
+
+        localStorage.setItem("user", JSON.stringify(userObj));
+        localStorage.setItem("token", res?.data.idToken);
+        setToken(res?.data.idToken!);
+        setUser(userObj!);
+        axios.defaults.headers.common["Authorization"] = `Bearer ${res?.data.idToken!}`;
+        return true;
       }
-      const userObj = {
-        userName: decodedToken.email,
-        email: decodedToken.email,
-      };
-      localStorage.setItem("user", JSON.stringify(userObj));
-      localStorage.setItem("token", res?.data.idToken);
-      setToken(res?.data.idToken!);
-      setUser(userObj!);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${res?.data.idToken!}`;
-      return true
+      return false;
+    } catch (err: any) {
+      setError(err.message || "Error en callbackSocialLoginUser");
+      return false;
     }
-    return false;
   };
 
-  const getGoogleOauthTokensUser = async (code: string) => {
-    const res = await getGoogleOauthTokens(code);
-    if (res?.status == 200) {
-      localStorage.setItem("google_oauth", "approved");
-      return true
+  const getGoogleOauthTokensUser = async (code: string, provider: string) => {
+    try {
+      const res = await getGoogleOauthTokens(code, provider);
+      if (res?.status === 200) {
+        // Guarda tokens en localStorage (no solo "approved")
+        localStorage.setItem("google_oauth", JSON.stringify(res.data));
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      setError(err.message || "Error en getGoogleOauthTokensUser");
+      return false;
     }
-    return false;
   };
 
-  const logoutUser = async () => {
+  const logoutUser = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    localStorage.removeItem("google_oauth");
+    setUser(null);
+    setToken(null);
+    delete axios.defaults.headers.common["Authorization"];
   };
 
   const isLoggedIn = () => {
-    return !!user;
+    if (!token) return false;
+    try {
+      const decoded = decodeToken(token);
+      if (!decoded?.exp) return false;
+      return decoded.exp * 1000 > Date.now(); // token no expirado
+    } catch {
+      return false;
+    }
   };
 
   return (

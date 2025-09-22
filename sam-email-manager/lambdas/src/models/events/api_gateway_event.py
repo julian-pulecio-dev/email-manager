@@ -51,6 +51,7 @@ class ApiGatewayEvent(Event):
     @classmethod
     def _get_body_parameters(cls, lambda_event: dict) -> dict:
         content_type = get_case_insensitive_value(lambda_event.get('headers', {}), 'content-type')
+        logger.debug(f"Content-Type: {content_type}")
         body = lambda_event.get('body', '') or b""
         
         if lambda_event.get('isBase64Encoded', False):
@@ -63,6 +64,9 @@ class ApiGatewayEvent(Event):
             body = bytes(body)
 
         body_len = len(body)
+
+        if not content_type:
+            raise InvalidRequestException("Content-Type header is missing")
         
         if 'application/json' in content_type:
             if body:

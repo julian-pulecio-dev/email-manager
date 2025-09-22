@@ -1,4 +1,5 @@
 import {cognitoUserPool} from "../Config/CognitoUserPool";
+import { useAuth } from "../Context/useAuth";
 
 const COGNITO_DOMAIN = cognitoUserPool.Domain;
 const CLIENT_ID = cognitoUserPool.ClientId;
@@ -8,7 +9,10 @@ const PROVIDER = "";
 
 const CognitoLoginComponent = () => {
 
+  const { logoutUser } = useAuth();
+
   const handleLogin = () => {
+    logoutUser()
     window.location.href = getLoginUrl();
   };
 

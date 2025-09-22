@@ -1,13 +1,14 @@
 import logging
-from boto3 import client
+import os
 import botocore
+from boto3 import client
 from boto3.dynamodb.conditions import Attr
 from dataclasses import dataclass
 from src.exceptions.dynamodb_exception import DynamoDBException
 
 # Logger configurado
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(os.getenv('LOGGER_LEVEL', 'INFO'))
 
 # Cliente global reutilizable
 dynamodb_client = client("dynamodb")
@@ -43,13 +44,17 @@ class DynamoDBTable:
             logger.debug(f"Scan en {self.table_name} con filtro {key_name}={key_value}")
             response = self.boto3_client.scan(
                 TableName=self.table_name,
-                FilterExpression=Attr(key_name).eq(key_value)
+                FilterExpression=f"{key_name} = :val",
+                ExpressionAttributeValues={
+                    ":val": {"S": key_value}
+                }
             )
             items = response.get("Items", [])
             return [DynamoDBItem.to_dict(item) for item in items]
         except botocore.exceptions.ClientError as e:
             logger.error(f"Error en scan_items: {e}")
             raise DynamoDBException(str(e))
+
 
 
 class DynamoDBItem:

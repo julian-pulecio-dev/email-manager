@@ -8,12 +8,13 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 @dataclass
-class GmailHistoryEvent(Gmail):
+class GmailHistoryEvent:
     messages_added: list[GmailMessage]
     creds: Credentials
 
     @classmethod
     def from_dict(cls, data: dict, creds: Credentials) -> "GmailHistoryEvent":
+        logger.info(f'Parsing GmailHistoryEvent from data: {data}')
         return cls(
             messages_added=[
                 GmailMessage.from_dict(msg, creds) for msg in data.get("messagesAdded", [])
