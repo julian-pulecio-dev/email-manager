@@ -30,17 +30,22 @@ $ terraform init
 $ terraform plan
 
 $ terraform apply
-
-
 ```
+## Architecture
+<img width="1365" height="899" alt="Captura de pantalla 2025-11-10 102331" src="https://github.com/user-attachments/assets/a3b0a933-700f-42f1-932c-916bb4ad0412" />
+
+## Auth flow
+<img width="798" height="490" alt="auth flow email manager " src="https://github.com/user-attachments/assets/808a8572-bdf3-4592-b5b8-3292d16e3ffc" />
 
 ## Contributing
 
-Pull requests are welcome. For major changes, please open an issue first
+Pull requests are welcome.
+ For major changes, please open an issue first
 to discuss what you would like to change.
 
 Please make sure to update tests as appropriate.
 
 ## License
+
 
 [MIT](https://choosealicense.com/licenses/mit/)
